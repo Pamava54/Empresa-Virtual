@@ -98,13 +98,13 @@ async function viewDocente(){
  <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">🧑‍🏫 Panel del docente · almacenamiento: <b>${Store.mode==="firebase"?"nube (Firebase)":"solo este equipo (modo prueba)"}</b></div></div><button class="gr" id="out">Salir</button></div>
  <div class="card"><h3>Grupo de empresas</h3>
   <p class="sm mu">Las 20 empresas son fijas. Escribe el nombre del estudiante que tiene cada una. “Reiniciar” borra el avance y el trabajo de esa empresa, pero la empresa y su código se conservan para el próximo grupo.</p>
-  <div class="toolbar"><button id="ref" class="sec">↻ Actualizar</button><button id="csv" class="sec">⬇ Exportar notas (Excel)</button><button id="rg" class="dg">Reiniciar TODO el grupo</button><button id="hs" class="gr">Cambiar una clave</button></div>
+  <div class="toolbar"><button id="ref" class="sec">↻ Actualizar</button><button id="csv" class="sec">⬇ Exportar notas (Excel)</button><button id="rg" class="dg">Reiniciar TODO el grupo</button><button id="hs" class="gr">Cambiar una clave</button><button id="pn" class="gr">🔌 Probar la nube</button></div>
   <div class="sc"><table><thead><tr><th>#</th><th>Empresa</th><th>Estudiante</th>${ESTACIONES.map(s=>`<th title="${s.t}">${s.n}</th>`).join("")}<th>Último cambio</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="sm mu">Cuadro de estaciones: nota = aprobada · ▶ = disponible · 🔒 = bloqueada. Nota mínima para aprobar: ${CFG.notaMinima.toFixed(1)}.</p></div>
  <div class="wmk">© ${CFG.marca}</div>`;
  $("#out").onclick=viewLogin;$("#ref").onclick=viewDocente;
  $("#csv").onclick=()=>exportar(all);
- $("#rg").onclick=reiniciarTodo;$("#hs").onclick=herramientaHuella;
+ $("#rg").onclick=reiniciarTodo;$("#hs").onclick=herramientaHuella;$("#pn").onclick=async()=>{toast("Probando…");const r=await Store.probar();alert(r);};
  document.querySelectorAll("[data-name]").forEach(i=>i.onchange=async()=>{const n=+i.dataset.name;const d=await cargar(n);d.alumno=i.value.trim();await Store.set(n,d);toast("Nombre guardado");});
  document.querySelectorAll("[data-reset]").forEach(b=>b.onclick=async()=>{const n=+b.dataset.reset;if(!confirm("¿Reiniciar la empresa "+n+"? Se borra el avance y el trabajo de su estudiante."))return;await Store.del(n);toast("Empresa "+n+" reiniciada");viewDocente();});
  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>detalle(+b.dataset.open));

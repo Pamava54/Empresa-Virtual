@@ -26,8 +26,8 @@ const NE=1;
  EMP=EMPRESAS[SES.n-1];
  D=await cargar(EMP.n);
  M=generarMes(EMP.n);
- D.trabajo.e1=D.trabajo.e1||{a:{},ok:{},tries:{},seen:{}};
- T=D.trabajo.e1;
+ T=D.trabajo.e1=D.trabajo.e1||{};
+ T.a=T.a||{};T.ok=T.ok||{};T.tries=T.tries||{};T.seen=T.seen||{};
  render();
 })();
 
