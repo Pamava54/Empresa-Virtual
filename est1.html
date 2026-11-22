@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 1 · Asientos contables · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 1 · ASIENTOS CONTABLES
+   Documentos del mes de la empresa → asiento por cada hecho → evaluación A/B
+   ===================================================================== */
+let SES=null,EMP=null,D=null,M=null,T=null,TAB="guia",FB={},EV=null;
+const NE=1;
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ M=generarMes(EMP.n);
+ D.trabajo.e1=D.trabajo.e1||{a:{},ok:{},tries:{},seen:{}};
+ T=D.trabajo.e1;
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function totalHechos(){return M.hechos.length;}
+function hechosListos(){return M.hechos.filter(h=>T.ok[h.id]||T.seen[h.id]).length;}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+
+function render(){
+ const nl=hechosListos(),tt=totalHechos();
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. Verás siempre el botón “Ver asiento correcto”.</div>`:""}
+ <div class="card"><h2>🧾 Estación 1 · Asientos contables</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · octubre de 2026</div>
+  <div style="margin-top:8px" class="sm mu">Asientos completados: ${nl} de ${tt}</div><div class="bar"><i style="width:${nl/tt*100}%"></i></div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes repasar todo lo que quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="hechos"?"":"gr"}" data-t="hechos">📑 Hechos del mes (${nl}/${tt})</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="hechos"?vHechos():vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>¿Qué es un asiento contable?</h3>
+ <p>Es el registro de un hecho económico (una compra, una venta, un pago…) en la contabilidad. Se basa en la <b>partida doble</b>: cada hecho afecta como mínimo dos cuentas, y el total del <b>Debe</b> siempre es igual al total del <b>Haber</b>.</p>
+ <div class="sc"><table><thead><tr><th>Tipo de cuenta</th><th>Aumenta con…</th><th>Disminuye con…</th><th>Ejemplos de este mes</th></tr></thead><tbody>
+ <tr><td><b>Activos</b> (lo que tiene la empresa)</td><td>Debe</td><td>Haber</td><td>Caja, Bancos, Clientes, Inventarios, Equipos</td></tr>
+ <tr><td><b>Pasivos</b> (lo que debe)</td><td>Haber</td><td>Debe</td><td>Proveedores, IVA generado</td></tr>
+ <tr><td><b>Patrimonio</b></td><td>Haber</td><td>Debe</td><td>Capital</td></tr>
+ <tr><td><b>Ingresos</b></td><td>Haber</td><td>Debe</td><td>Ingresos por venta de mercancías</td></tr>
+ <tr><td><b>Gastos y costos</b></td><td>Debe</td><td>Haber</td><td>Arriendo, servicios, sueldos, costo de ventas</td></tr></tbody></table></div></div>
+ <div class="card"><h3>El IVA en las compras y en las ventas (19%)</h3>
+ <p><b>Cuando compras:</b> el IVA que pagas lo puedes descontar después, por eso va al <b>Debe</b> en <b>IVA descontable</b>.<br><b>Cuando vendes:</b> el IVA que cobras no es tuyo, es del Estado: va al <b>Haber</b> en <b>IVA generado</b>.</p></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li>Entra a <b>Hechos del mes</b>: verás los 19 documentos de tu empresa (facturas, recibos, comprobantes), en orden de fecha.</li>
+ <li>Debajo de cada documento arma el asiento: elige la <b>cuenta</b> y escribe el valor en <b>Debe</b> o en <b>Haber</b>. Con “+ línea” agregas más cuentas.</li>
+ <li>Pulsa <b>Revisar</b>. Si está bien, se pone en verde. Si no, te doy una pista. Con dos intentos fallidos puedes ver el asiento correcto.</li>
+ <li>Cuando completes los 19, se abre la <b>Evaluación</b> de 5 preguntas sobre tu propia empresa. Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 2.</li></ol>
+ <div class="c"><button data-t2="hechos">Empezar con los hechos →</button></div></div>
+ <div class="card"><h3>Cuentas que vas a usar</h3><div class="sc"><table><tbody>${PUC_LIST.map(c=>`<tr><td><b>${c}</b></td><td>${PUC[c]}</td></tr>`).join("")}</tbody></table></div></div>`;
+}
+
+/* ---------------- HECHOS ---------------- */
+function docHtml(d){
+ return`<div class="doc"><div class="dh"><b>${esc(d.tit)}</b><span>No. ${esc(d.num)} · ${esc(d.fecha)}</span></div>
+ <div class="dp">${d.partes.map(p=>`<div><span class="mu">${esc(p[0])}:</span> <b>${esc(p[1])}</b></div>`).join("")}</div>
+ ${d.filas?`<table><thead><tr><th>Descripción</th><th class="n">Cant.</th><th class="n">Vr. unitario</th><th class="n">Vr. total</th></tr></thead><tbody>${d.filas.map(f=>`<tr><td>${esc(f[0])}</td><td class="n">${f[1]}</td><td class="n">${fmt(f[2])}</td><td class="n">${fmt(f[3])}</td></tr>`).join("")}</tbody></table>`:""}
+ <div class="tt">${d.tot.map((t,i)=>`<div class="${i===d.tot.length-1?"t":""}"><span>${esc(t[0])}</span><span>${esc(t[1])}</span></div>`).join("")}</div>
+ ${d.nota?`<div class="nt">ℹ️ ${esc(d.nota)}</div>`:""}</div>`;
+}
+function lineas(h){if(!T.a[h.id])T.a[h.id]=[{c:"",d:"",h:""},{c:"",d:"",h:""}];return T.a[h.id];}
+function evaluar(h){
+ const L=lineas(h);
+ const vals=L.map(l=>{const d=parseM(l.d),hh=parseM(l.h);return{c:l.c,s:d>0&&hh===0?"D":(hh>0&&d===0?"H":""),v:d>0?d:hh,lleno:!!(l.c||d||hh),amb:d>0&&hh>0};});
+ const used=[],res=vals.map(()=>null);let found=0;
+ h.asiento.forEach(e=>{
+  for(let i=0;i<vals.length;i++){if(used[i])continue;const x=vals[i];if(x.c===e.c&&x.s===e.s&&x.v===e.v){used[i]=1;res[i]=true;found++;break;}}
+ });
+ vals.forEach((x,i)=>{if(res[i]===null&&x.lleno)res[i]=false;});
+ const llenos=vals.filter(x=>x.lleno).length;
+ const sd=vals.filter(x=>x.s==="D").reduce((s,x)=>s+x.v,0),sh=vals.filter(x=>x.s==="H").reduce((s,x)=>s+x.v,0);
+ return{ok:found===h.asiento.length&&llenos===h.asiento.length,found,total:h.asiento.length,lineOk:res,cuadra:sd===sh&&sd>0,sd,sh};
+}
+function solHtml(h){
+ return`<div class="note sm"><b>Asiento correcto:</b><table style="margin-top:4px">${h.asiento.map(l=>`<tr><td>${l.c} · ${PUC[l.c]}</td><td class="n" style="text-align:right">${l.s==="D"?fmt(l.v):""}</td><td class="n" style="text-align:right">${l.s==="H"?fmt(l.v):""}</td></tr>`).join("")}</table></div>`;
+}
+function vHechos(){
+ const cards=M.hechos.map(h=>{
+  const L=lineas(h),done=T.ok[h.id],seen=T.seen[h.id],fb=FB[h.id];
+  const opts=sel=>`<option value="">— cuenta —</option>`+PUC_LIST.map(c=>`<option value="${c}" ${sel===c?"selected":""}>${c} · ${PUC[c]}</option>`).join("");
+  const bloq=!!(done||seen);
+  const lns=L.map((l,i)=>{
+   const cl=fb&&fb.lineOk&&fb.lineOk[i]===true?"ok":(fb&&fb.lineOk&&fb.lineOk[i]===false?"bad":"");
+   return`<div class="ln"><select data-h="${h.id}" data-i="${i}" data-f="c" class="${cl}" ${bloq?"disabled":""}>${opts(l.c)}</select>
+   <input inputmode="numeric" placeholder="Debe" data-h="${h.id}" data-i="${i}" data-f="d" value="${esc(l.d)}" class="${cl}" ${bloq?"disabled":""}>
+   <input inputmode="numeric" placeholder="Haber" data-h="${h.id}" data-i="${i}" data-f="h" value="${esc(l.h)}" class="${cl}" ${bloq?"disabled":""}></div>`;}).join("");
+  let msg="";
+  if(fb&&!done){
+   msg=`<div class="note r sm">${!fb.cuadra&&(fb.sd||fb.sh)?"El Debe ("+fmt(fb.sd)+") y el Haber ("+fmt(fb.sh)+") no son iguales. ":""}Tienes <b>${fb.found} de ${fb.total}</b> líneas correctas. <b>Pista:</b> ${esc(h.pista)}</div>`;
+  }
+  const tries=T.tries[h.id]||0;
+  const puedeVer=!done&&!seen&&(tries>=2||esDoc());
+  return`<div class="hc ${done?"done":""}" id="h${h.id}">
+  <h3><span>Hecho ${h.id} · ${esc(h.t)}</span>${done?`<span class="pill ok">✅ Correcto</span>`:seen?`<span class="pill w">👁 Visto</span>`:`<span class="pill">${esc(h.doc.fecha)}</span>`}</h3>
+  ${docHtml(h.doc)}
+  <div style="margin-top:10px"><b>Tu asiento:</b>${lns}
+  ${bloq?"":`<div class="toolbar"><button class="sec s" data-add="${h.id}">+ línea</button><button data-chk="${h.id}">✔ Revisar</button>${puedeVer?`<button class="gr" data-see="${h.id}">👁 Ver asiento correcto</button>`:""}</div>`}
+  ${msg}${seen||done?(seen&&!done?solHtml(h):""):""}</div></div>`;}).join("");
+ return`<div class="note">Arma un asiento para cada documento. Los valores de tu empresa son distintos a los de tus compañeros.</div>${cards}
+ <div class="card c">${hechosListos()===totalHechos()?`<b>🎉 ¡Completaste los ${totalHechos()} asientos!</b><p>Ya puedes presentar la evaluación.</p><button data-t2="eval">Ir a la evaluación →</button>`:`<span class="mu">Te faltan ${totalHechos()-hechosListos()} asientos para abrir la evaluación.</span>`}</div>`;
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let k=1;while(set.length<4){const x=ok+k*1000;if(!set.includes(x))set.push(x);k++;}return set.slice(0,4).map(x=>({t:fmt(x),ok:x===ok}));}
+function H(k){return M.hechos.find(h=>h.k===k);}
+function construir(v,seed){
+ const Q=[];
+ if(v==="A"){
+  const a=H("compraCred1"),b=H("ventaCred1"),c=H("pagoProv");
+  Q.push({t:"En la factura de compra a crédito de "+a.vals.prov+" (base "+fmt(a.vals.base)+" + IVA "+fmt(a.vals.iva)+"), ¿qué valor se acredita en Proveedores?",o:numOpts(a.vals.total,[a.vals.base,a.vals.iva,a.vals.total+a.vals.iva]),e:"Se le debe al proveedor el total de la factura: base + IVA = "+fmt(a.vals.total)+"."});
+  Q.push({t:"Verdadero o falso: el IVA que se paga en una compra de mercancías se registra en el Debe, en la cuenta IVA descontable.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: el IVA de las compras es descontable y se registra en el Debe."});
+  Q.push({t:"Al vender de contado en efectivo con IVA, ¿cuál es el asiento correcto?",o:[
+   {t:"Debe: Caja. Haber: Ingresos por ventas e IVA generado.",ok:true},
+   {t:"Debe: Clientes. Haber: Ingresos por ventas e IVA generado.",ok:false},
+   {t:"Debe: Ingresos por ventas. Haber: Caja.",ok:false},
+   {t:"Debe: Caja. Haber: IVA descontable.",ok:false}],e:"Entra efectivo (Debe en Caja) y se reconoce el ingreso y el IVA generado en el Haber."});
+  Q.push({t:"En la venta a crédito a "+b.vals.cli+", ¿por qué valor se debita la cuenta Clientes?",o:numOpts(b.vals.total,[b.vals.base,b.vals.iva,b.vals.total-b.vals.iva+b.vals.iva*2]),e:"El cliente debe el total de la factura: "+fmt(b.vals.total)+" (base + IVA)."});
+  Q.push({t:"Al pagar con cheque un abono a "+c.vals.prov+" por "+fmt(c.vals.valor)+", ¿qué cuentas se afectan?",o:[
+   {t:"Debe: Proveedores. Haber: Bancos.",ok:true},{t:"Debe: Bancos. Haber: Proveedores.",ok:false},{t:"Debe: Gastos. Haber: Bancos.",ok:false},{t:"Debe: Proveedores. Haber: Caja.",ok:false}],e:"La deuda baja (Proveedores en el Debe) y sale plata del banco (Haber)."});
+ }else{
+  const a=H("compraCont"),b=H("ventaBco"),c=H("cobro1");
+  Q.push({t:"En la compra de contado con cheque a "+a.vals.prov+" (base "+fmt(a.vals.base)+" + IVA "+fmt(a.vals.iva)+"), ¿por qué valor se acredita Bancos?",o:numOpts(a.vals.total,[a.vals.base,a.vals.iva,a.vals.total+a.vals.iva]),e:"Sale del banco el total pagado: base + IVA = "+fmt(a.vals.total)+"."});
+  Q.push({t:"Verdadero o falso: en una venta a crédito se debita la cuenta Caja.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: como no entra plata todavía, se debita Clientes (el cliente queda debiendo)."});
+  Q.push({t:"¿En qué cuenta se registra lo que aportan los socios al constituir la empresa?",o:[
+   {t:"Capital",ok:true},{t:"Ingresos por venta de mercancías",ok:false},{t:"Proveedores",ok:false},{t:"Clientes",ok:false}],e:"Los aportes de los socios se acreditan en el capital (patrimonio)."});
+  Q.push({t:"En la venta pagada con datáfono (base "+fmt(b.vals.base)+"), ¿cuánto es el IVA generado?",o:numOpts(b.vals.iva,[b.vals.base,b.vals.total,Math.round(b.vals.base*0.1)]),e:"El IVA generado es el 19% de la base: "+fmt(b.vals.iva)+"."});
+  Q.push({t:"Al cobrar por transferencia un abono de "+c.vals.cli+" por "+fmt(c.vals.valor)+", ¿qué cuentas se afectan?",o:[
+   {t:"Debe: Bancos. Haber: Clientes.",ok:true},{t:"Debe: Clientes. Haber: Bancos.",ok:false},{t:"Debe: Bancos. Haber: Ingresos por ventas.",ok:false},{t:"Debe: Caja. Haber: Clientes.",ok:false}],e:"Entra plata al banco (Debe) y la deuda del cliente baja (Clientes al Haber)."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(hechosListos()<totalHechos()&&!esDoc()){
+  return`<div class="card"><h3>🔒 La evaluación se abre al completar los ${totalHechos()} asientos</h3><p class="mu">Te faltan ${totalHechos()-hechosListos()}. Ve a “Hechos del mes”.</p></div>`;
+ }
+ if(!EV){
+  const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";
+  EV={v,qs:construir(v,hashStr("ev"+EMP.n+v+n)),ans:{},fin:false};
+ }
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{
+  const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}
+  ${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){
+  const nota=EV.nota;const pasa=nota>=CFG.notaMinima;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div>
+  <h2>${pasa?"🎉 ¡Aprobaste la estación 1!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Se abrió la estación 2 · Libros contables.":"Repasa los hechos y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-t2="hechos">Revisar mis asientos</button></div></div>`;
+ }
+ return`<div class="card"><h3>📝 Evaluación · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre los hechos de tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>
+ ${EV.fin?res:""}${qs}
+ ${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("select[data-h],input[data-h]").forEach(el=>{
+  const ch=()=>{const L=lineas(M.hechos[+el.dataset.h-1]);L[+el.dataset.i][el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();};
+  el.oninput=ch;el.onchange=ch;
+ });
+ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{const h=M.hechos[+b.dataset.add-1];const L=lineas(h);if(L.length<6){L.push({c:"",d:"",h:""});guardar();keep(render);}});
+ document.querySelectorAll("[data-chk]").forEach(b=>b.onclick=async()=>{
+  const h=M.hechos[+b.dataset.chk-1];const r=evaluar(h);FB[h.id]=r;
+  if(r.ok){T.ok[h.id]=1;}else{T.tries[h.id]=(T.tries[h.id]||0)+1;}
+  await guardar();keep(render);
+ });
+ document.querySelectorAll("[data-see]").forEach(b=>b.onclick=async()=>{const h=M.hechos[+b.dataset.see-1];T.seen[h.id]=1;await guardar();keep(render);});
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;
+  const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);
+ };
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>

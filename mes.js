@@ -1,0 +1,199 @@
+/* =====================================================================
+   MES DE OPERACIONES · generador de hechos económicos por empresa
+   Cada empresa vive el mismo mes (octubre de 2026) con cifras propias.
+   Las demás estaciones (libros, conciliación, inventarios, estados) usan estos mismos hechos.
+   Empresas y cifras ficticias, con fines educativos.
+   ===================================================================== */
+
+const PUC={
+ "110505":"Caja general","111005":"Bancos – Moneda nacional","130505":"Clientes nacionales",
+ "143505":"Mercancías no fabricadas por la empresa","152805":"Equipos de procesamiento de datos",
+ "220505":"Proveedores nacionales","240801":"IVA generado","240802":"IVA descontable",
+ "310505":"Capital autorizado (capital suscrito y pagado)","413595":"Ingresos por venta de mercancías",
+ "510506":"Sueldos","512010":"Arrendamientos – construcciones y edificaciones","513525":"Acueducto y alcantarillado",
+ "513530":"Energía eléctrica","513535":"Teléfono e internet","519530":"Útiles, papelería y fotocopias",
+ "530505":"Gastos bancarios","613595":"Costo de ventas – comercio"
+};
+const PUC_LIST=Object.keys(PUC).sort();
+
+const FLAVOR={
+ 1:["útiles escolares y papelería",["Distribuidora Norma Útiles","Papeles del Tolima Ltda.","Importadora Escolar S.A.S."],["Colegio San Simón","Jardín Los Pitufos"]],
+ 2:["materiales de ferretería y construcción",["Aceros del Centro S.A.","Pinturas Colorín S.A.S.","Distribuidora Herramax"],["Constructora Horizonte","Obras y Diseños S.A.S."]],
+ 3:["víveres y abarrotes",["Lácteos La Pradera","Distribuidora Alimentos del Sur","Bebidas Nacional S.A."],["Restaurante El Fogón","Hotel Real Ibagué"]],
+ 4:["medicamentos y productos de salud",["Laboratorios Andes","Mayorista Salud Total","Cosméticos Belleza Pura"],["Clínica San José","Hogar Geriátrico Esperanza"]],
+ 5:["harinas, lácteos e insumos de panadería",["Harinas del Tolima","Lácteos La Pradera","Empaques y Más S.A.S."],["Cafetería Aroma","Colegio Santa Ana"]],
+ 6:["carnes, verduras e insumos de cocina",["Carnes Frescas Ltda.","Plaza Mayorista de Ibagué","Gases del Centro S.A."],["Empresa Eventos Pijao","Hotel Campestre"]],
+ 7:["prendas de vestir y accesorios",["Confecciones Primavera","Textiles Andinos","Calzado Colombia S.A."],["Colegio Técnico Industrial","Cliente Laura Gómez"]],
+ 8:["repuestos y lubricantes",["Autopartes del Valle","Lubricantes Andinos","Llantas y Rines S.A.S."],["Transportes Andinos","Flota Taxis Ibagué"]],
+ 9:["insumos odontológicos",["Dental Supply S.A.S.","Laboratorio Prótesis Ibagué","Insumos Médicos del Centro"],["Medicina prepagada convenio","Empresa convenio Textiles"]],
+ 10:["productos lácteos",["Ganaderos Unidos","Empaques Plásticos S.A.","Combustibles del Tolima"],["Supermercado El Ahorro","Cafetería Aroma"]],
+ 11:["paquetes y servicios turísticos",["Hotel Cañón del Combeima","Transportes Turísticos Andes","Operador Mayorista Colombia"],["Grupo familiar Pérez","Colegio Santa Ana"]],
+ 12:["productos de belleza y capilares",["Cosméticos Belleza Pura","Distribuidora Capilar","Insumos Estéticos S.A.S."],["Empresa Eventos Luna","Cliente Sandra Díaz"]],
+ 13:["helados, café y desechables",["Lácteos La Pradera","Café Selecto S.A.","Desechables y Empaques"],["Colegio Santa Ana","Eventos Infantiles Arcoíris"]],
+ 14:["celulares y accesorios",["Importadora Tech Mundo","Accesorios Digitales S.A.S.","Distribuidora Móvil del Sur"],["Empresa Seguridad Total","Cliente Camilo Vargas"]],
+ 15:["alimentos y accesorios para mascotas",["Concentrados del Sur","Distribuidora Mascotas S.A.S.","Laboratorio Veterinario Andes"],["Criadero Los Pinos","Cliente Marcela Ruiz"]],
+ 16:["suplementos y equipos de entrenamiento",["Nutrición Deportiva S.A.","Equipos Fitness Colombia","Distribuidora Vital"],["Empresa convenio Textiles","Colegio Técnico Industrial"]],
+ 17:["insumos de lavandería",["Químicos del Centro","Detergentes Brisa S.A.S.","Empaques y Más S.A.S."],["Hotel Real Ibagué","Clínica San José"]],
+ 18:["flores e insumos de floristería",["Flores del Tolima","Cultivos La Sabana","Empaques y Más S.A.S."],["Eventos Luna","Hotel Campestre"]],
+ 19:["monturas y lentes",["Ópticas Mayorista S.A.","Lentes Andinos","Estuches y Accesorios S.A.S."],["Empresa convenio Textiles","Colegio Santa Ana"]],
+ 20:["libros y papelería",["Editorial Andina","Distribuidora de Libros del Sur","Papeles del Tolima Ltda."],["Colegio San Simón","Biblioteca Municipal"]],
+ 21:["víveres y abarrotes",["Lácteos La Pradera","Distribuidora Alimentos del Sur","Bebidas Nacional S.A."],["Restaurante El Fogón","Hotel Real Ibagué"]]
+};
+
+function nitDe(texto){const h=hashStr("nit"+texto);const x=String(800000000+(h%199999999));return x.slice(0,3)+"."+x.slice(3,6)+"."+x.slice(6,9)+"-"+(h%10);}
+function dia(d){return String(d).padStart(2,"0")+" oct. 2026";}
+
+function generarMes(n){
+ const R=mulberry32(hashStr("mes#"+n));
+ const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+ const F=FLAVOR[n],prod=F[0],PV=F[1],CL=F[2];
+ const emp=EMPRESAS[n-1];
+ const esc=0.7+R()*1.3;
+ const rr=(lo,hi,step)=>Math.max(step,Math.round((lo+R()*(hi-lo))*esc/step)*step);
+ const iva=b=>Math.round(b*0.19);
+ const miNit=emp.nit;
+ let fc=ri(100,800),fv=ri(1000,4000),ce=ri(200,900),rc=ri(300,900),ck=ri(1010,3900);
+
+ // ---- cifras base ----
+ const q1=ri(12,60),u1=rr(8000,60000,50),c1=q1*u1;
+ const q2=ri(8,40),u2=rr(9000,70000,50),c2=q2*u2;
+ const q3=ri(10,50),u3=rr(8000,65000,50),c3=q3*u3;
+ const Pc=c1+c2+c3;
+ const S=Math.round(Pc*0.95/1000)*1000;
+ const s1=Math.round(S*0.30/100)*100,s2=Math.round(S*0.22/100)*100,s3=Math.round(S*0.20/100)*100,s4=Math.round(S*0.28/100)*100;
+ const tot=b=>b+iva(b);
+ const sTotal=s1+s2+s3+s4;
+ const costo=Math.round(sTotal*0.6/1000)*1000;
+ const eq=rr(1200000,3500000,10000);
+ const arr=rr(500000,1800000,10000),ene=rr(120000,450000,1000),net=rr(90000,260000,1000),nom=rr(900000,2400000,10000),util=rr(30000,90000,1000);
+ const pagoProv=Math.round(tot(c1)*0.6/1000)*1000;
+ const cobro1=Math.round(tot(s1)*0.5/1000)*1000;
+ const cobro2=Math.round(tot(s4)*0.4/1000)*1000;
+ const Ac=rr(1500000,3000000,50000);
+ const consig=Math.round(0.6*(Ac+tot(s2))/1000)*1000;
+ const bankOut=tot(c2)+pagoProv+arr+ene+net+nom;
+ const Ab=Math.ceil((bankOut+500000)/100000)*100000;
+ const capital=Ac+Ab;
+
+ const H=[];
+ const add=h=>{h.id=H.length+1;H.push(h);return h;};
+ const P=(a,b)=>[a,b];
+ const filaBase=(desc,q,u)=>[[desc,q,u,q*u]];
+ const D=(tit,num,d,partes,filas,tt,nota)=>({tit,num,fecha:dia(d),partes,filas,tot:tt,nota});
+
+ add({k:"aportes",dia:1,t:"Constitución: aportes de los socios",
+  doc:D("ACTA DE CONSTITUCIÓN · RECIBO DE APORTES","AC-001",1,[P("Empresa",emp.nombre),P("NIT",miNit),P("Socios","Aportes iniciales"),P("Fecha",dia(1))],null,
+   [["Aporte en efectivo (caja)",fmt(Ac)],["Aporte consignado en banco",fmt(Ab)],["Capital total aportado",fmt(capital)]],"Los socios aportan para iniciar operaciones. El efectivo queda en la caja y el resto en la cuenta bancaria."),
+  asiento:[{c:"110505",s:"D",v:Ac},{c:"111005",s:"D",v:Ab},{c:"310505",s:"H",v:capital}],
+  pista:"Lo que entra a la empresa va al Debe (caja y bancos). Lo que aportan los socios se acredita en el capital."});
+
+ add({k:"compraCred1",dia:2,t:"Compra de "+prod+" a crédito",
+  doc:D("FACTURA DE COMPRA","FC-"+(fc++),2,[P("Proveedor",PV[0]),P("NIT proveedor",nitDe(PV[0])),P("Comprador",emp.nombre),P("Forma de pago","Crédito a 30 días")],
+   filaBase("Mercancía: "+prod,q1,u1),[["Subtotal",fmt(c1)],["IVA 19%",fmt(iva(c1))],["TOTAL A PAGAR",fmt(tot(c1))]]),
+  asiento:[{c:"143505",s:"D",v:c1},{c:"240802",s:"D",v:iva(c1)},{c:"220505",s:"H",v:tot(c1)}],
+  pista:"La mercancía entra a inventarios por su valor sin IVA. El IVA de la compra es descontable (Debe). Se debe el total al proveedor.",
+  vals:{prov:PV[0],base:c1,iva:iva(c1),total:tot(c1)}});
+
+ add({k:"compraCont",dia:3,t:"Compra de "+prod+" de contado (cheque)",
+  doc:D("FACTURA DE COMPRA","FC-"+(fc++),3,[P("Proveedor",PV[1]),P("NIT proveedor",nitDe(PV[1])),P("Comprador",emp.nombre),P("Forma de pago","Contado · cheque No. "+(ck++)+" ("+emp.banco.n+")")],
+   filaBase("Mercancía: "+prod,q2,u2),[["Subtotal",fmt(c2)],["IVA 19%",fmt(iva(c2))],["TOTAL PAGADO",fmt(tot(c2))]]),
+  asiento:[{c:"143505",s:"D",v:c2},{c:"240802",s:"D",v:iva(c2)},{c:"111005",s:"H",v:tot(c2)}],
+  pista:"Igual que la compra a crédito, pero como se pagó con cheque sale plata del banco (Haber).",
+  vals:{prov:PV[1],base:c2,iva:iva(c2),total:tot(c2)}});
+
+ add({k:"ventaEf",dia:5,t:"Venta de contado en efectivo",
+  doc:D("FACTURA DE VENTA","FV-"+(fv++),5,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente","Ventas de mostrador"),P("Forma de pago","Contado · efectivo")],
+   filaBase("Venta de "+prod,1,s2),[["Subtotal",fmt(s2)],["IVA 19%",fmt(iva(s2))],["TOTAL RECIBIDO",fmt(tot(s2))]]),
+  asiento:[{c:"110505",s:"D",v:tot(s2)},{c:"413595",s:"H",v:s2},{c:"240801",s:"H",v:iva(s2)}],
+  pista:"Entra efectivo (Debe en caja por el total). La venta es un ingreso y el IVA cobrado es IVA generado, ambos en el Haber.",
+  vals:{base:s2,iva:iva(s2),total:tot(s2)}});
+
+ add({k:"ventaCred1",dia:6,t:"Venta a crédito a "+CL[0],
+  doc:D("FACTURA DE VENTA","FV-"+(fv++),6,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente",CL[0]),P("Forma de pago","Crédito a 30 días")],
+   filaBase("Venta de "+prod,1,s1),[["Subtotal",fmt(s1)],["IVA 19%",fmt(iva(s1))],["TOTAL A COBRAR",fmt(tot(s1))]]),
+  asiento:[{c:"130505",s:"D",v:tot(s1)},{c:"413595",s:"H",v:s1},{c:"240801",s:"H",v:iva(s1)}],
+  pista:"Como no se cobra todavía, no entra plata: el cliente nos debe (Clientes, en el Debe por el total).",
+  vals:{cli:CL[0],base:s1,iva:iva(s1),total:tot(s1)}});
+
+ add({k:"arriendo",dia:8,t:"Pago del arriendo del local",
+  doc:D("COMPROBANTE DE EGRESO","CE-"+(ce++),8,[P("Pagado a","Inmobiliaria Centro Ibagué"),P("Concepto","Arriendo del local · octubre"),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(arr)]]),
+  asiento:[{c:"512010",s:"D",v:arr},{c:"111005",s:"H",v:arr}],
+  pista:"El arriendo es un gasto (Debe). Salió plata del banco (Haber)."});
+
+ add({k:"energia",dia:9,t:"Pago del servicio de energía",
+  doc:D("FACTURA DE SERVICIO PÚBLICO","SP-"+ri(10000,99999),9,[P("Empresa de energía","Energía del Tolima S.A. E.S.P."),P("Cliente",emp.nombre),P("Periodo","Septiembre–octubre"),P("Medio de pago","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(ene)]]),
+  asiento:[{c:"513530",s:"D",v:ene},{c:"111005",s:"H",v:ene}],
+  pista:"Los servicios públicos son un gasto (Debe). Se pagó desde el banco (Haber)."});
+
+ add({k:"consig",dia:10,t:"Consignación de efectivo al banco",
+  doc:D("VOLANTE DE CONSIGNACIÓN","VC-"+ri(1000,9999),10,[P("Banco",emp.banco.n),P("Cuenta",emp.cuenta),P("Titular",emp.nombre),P("Concepto","Consignación en efectivo")],null,[["VALOR CONSIGNADO",fmt(consig)]],"El dinero sale de la caja y entra al banco."),
+  asiento:[{c:"111005",s:"D",v:consig},{c:"110505",s:"H",v:consig}],
+  pista:"Es un movimiento entre dos cuentas de la misma empresa: entra al banco (Debe) y sale de la caja (Haber).",
+  vals:{valor:consig}});
+
+ add({k:"pagoProv",dia:12,t:"Pago parcial a "+PV[0]+" (cheque)",
+  doc:D("COMPROBANTE DE EGRESO","CE-"+(ce++),12,[P("Pagado a",PV[0]),P("Concepto","Abono a la factura "+H[1].doc.num),P("Medio de pago","Cheque No. "+(ck++)+" · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR DEL ABONO",fmt(pagoProv)]],"Es un abono: todavía queda saldo pendiente con el proveedor."),
+  asiento:[{c:"220505",s:"D",v:pagoProv},{c:"111005",s:"H",v:pagoProv}],
+  pista:"Al pagar una deuda, la deuda disminuye (Proveedores en el Debe) y sale plata del banco (Haber).",
+  vals:{prov:PV[0],valor:pagoProv}});
+
+ add({k:"equipo",dia:14,t:"Compra de un computador a crédito",
+  doc:D("FACTURA DE COMPRA","FC-"+(fc++),14,[P("Proveedor","Tecnología y Equipos del Tolima"),P("NIT proveedor",nitDe("TecEq")),P("Comprador",emp.nombre),P("Forma de pago","Crédito a 60 días")],
+   filaBase("Equipo de cómputo para la administración",1,eq),[["Subtotal",fmt(eq)],["IVA 19%",fmt(iva(eq))],["TOTAL A PAGAR",fmt(tot(eq))]],"Se usará varios años en la empresa, por eso no es un gasto: es un activo."),
+  asiento:[{c:"152805",s:"D",v:eq},{c:"240802",s:"D",v:iva(eq)},{c:"220505",s:"H",v:tot(eq)}],
+  pista:"Un equipo que se usa por años es un activo (Equipos de procesamiento de datos). El IVA es descontable y se debe el total."});
+
+ add({k:"nomina",dia:15,t:"Pago de la nómina",
+  doc:D("PLANILLA DE NÓMINA","NM-"+ri(100,999),15,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empleados","Personal de la empresa")],null,[["TOTAL SUELDOS PAGADOS",fmt(nom)]],"Para este ejercicio se registra solo el sueldo pagado (sin prestaciones ni aportes)."),
+  asiento:[{c:"510506",s:"D",v:nom},{c:"111005",s:"H",v:nom}],
+  pista:"Los sueldos son un gasto (Debe) y se pagaron desde el banco (Haber)."});
+
+ add({k:"ventaBco",dia:16,t:"Venta pagada con datáfono (entra al banco)",
+  doc:D("FACTURA DE VENTA","FV-"+(fv++),16,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente","Ventas de mostrador"),P("Forma de pago","Tarjeta · el valor se abona en el banco")],
+   filaBase("Venta de "+prod,1,s3),[["Subtotal",fmt(s3)],["IVA 19%",fmt(iva(s3))],["TOTAL ABONADO AL BANCO",fmt(tot(s3))]]),
+  asiento:[{c:"111005",s:"D",v:tot(s3)},{c:"413595",s:"H",v:s3},{c:"240801",s:"H",v:iva(s3)}],
+  pista:"Igual que la venta de contado, pero el dinero entra al banco y no a la caja.",
+  vals:{base:s3,iva:iva(s3),total:tot(s3)}});
+
+ add({k:"compraCred2",dia:18,t:"Compra de "+prod+" a crédito",
+  doc:D("FACTURA DE COMPRA","FC-"+(fc++),18,[P("Proveedor",PV[2]),P("NIT proveedor",nitDe(PV[2])),P("Comprador",emp.nombre),P("Forma de pago","Crédito a 30 días")],
+   filaBase("Mercancía: "+prod,q3,u3),[["Subtotal",fmt(c3)],["IVA 19%",fmt(iva(c3))],["TOTAL A PAGAR",fmt(tot(c3))]]),
+  asiento:[{c:"143505",s:"D",v:c3},{c:"240802",s:"D",v:iva(c3)},{c:"220505",s:"H",v:tot(c3)}],
+  pista:"Mercancía por su valor sin IVA, IVA descontable y el total a Proveedores.",
+  vals:{prov:PV[2],base:c3,iva:iva(c3),total:tot(c3)}});
+
+ add({k:"ventaCred2",dia:20,t:"Venta a crédito a "+CL[1],
+  doc:D("FACTURA DE VENTA","FV-"+(fv++),20,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente",CL[1]),P("Forma de pago","Crédito a 30 días")],
+   filaBase("Venta de "+prod,1,s4),[["Subtotal",fmt(s4)],["IVA 19%",fmt(iva(s4))],["TOTAL A COBRAR",fmt(tot(s4))]]),
+  asiento:[{c:"130505",s:"D",v:tot(s4)},{c:"413595",s:"H",v:s4},{c:"240801",s:"H",v:iva(s4)}],
+  pista:"El cliente queda debiendo el total (Clientes al Debe). Ingreso e IVA generado al Haber.",
+  vals:{cli:CL[1],base:s4,iva:iva(s4),total:tot(s4)}});
+
+ add({k:"internet",dia:22,t:"Pago de internet y teléfono",
+  doc:D("FACTURA DE SERVICIO","SP-"+ri(10000,99999),22,[P("Empresa de telecomunicaciones","Comunicaciones del Centro S.A."),P("Cliente",emp.nombre),P("Servicio","Internet y telefonía"),P("Medio de pago","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(net)]]),
+  asiento:[{c:"513535",s:"D",v:net},{c:"111005",s:"H",v:net}],
+  pista:"Gasto de internet y teléfono (Debe) pagado desde el banco (Haber)."});
+
+ add({k:"utiles",dia:25,t:"Compra de papelería para la oficina (efectivo)",
+  doc:D("RECIBO DE CAJA MENOR","CM-"+ri(100,999),25,[P("Pagado a","Papelería La Esquina"),P("Concepto","Útiles de oficina y fotocopias"),P("Medio de pago","Efectivo de la caja"),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(util)]]),
+  asiento:[{c:"519530",s:"D",v:util},{c:"110505",s:"H",v:util}],
+  pista:"Gasto de papelería (Debe) pagado con efectivo de la caja (Haber)."});
+
+ add({k:"cobro1",dia:27,t:"Cobro parcial a "+CL[0]+" (transferencia)",
+  doc:D("RECIBO DE CAJA","RC-"+(rc++),27,[P("Recibido de",CL[0]),P("Concepto","Abono a la factura "+H[4].doc.num),P("Medio","Transferencia a "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR RECIBIDO",fmt(cobro1)]],"Es un abono: el cliente aún debe el resto."),
+  asiento:[{c:"111005",s:"D",v:cobro1},{c:"130505",s:"H",v:cobro1}],
+  pista:"Entra plata al banco (Debe) y la deuda del cliente baja (Clientes al Haber).",
+  vals:{cli:CL[0],valor:cobro1}});
+
+ add({k:"cobro2",dia:28,t:"Cobro parcial a "+CL[1]+" (efectivo)",
+  doc:D("RECIBO DE CAJA","RC-"+(rc++),28,[P("Recibido de",CL[1]),P("Concepto","Abono a la factura "+H[13].doc.num),P("Medio","Efectivo"),P("Empresa",emp.nombre)],null,[["VALOR RECIBIDO",fmt(cobro2)]]),
+  asiento:[{c:"110505",s:"D",v:cobro2},{c:"130505",s:"H",v:cobro2}],
+  pista:"Entra efectivo a la caja (Debe) y la deuda del cliente baja (Clientes al Haber)."});
+
+ add({k:"costo",dia:30,t:"Costo de las ventas del mes",
+  doc:D("REPORTE DE INVENTARIO PERMANENTE (KARDEX)","KD-OCT",30,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Producto","Mercancía: "+prod),P("Método","Costo de lo vendido en el mes")],null,[["COSTO DE LA MERCANCÍA VENDIDA",fmt(costo)]],"Al vender, la mercancía sale del inventario y se reconoce su costo."),
+  asiento:[{c:"613595",s:"D",v:costo},{c:"143505",s:"H",v:costo}],
+  pista:"El costo de ventas es un gasto (Debe) y la mercancía vendida sale del inventario (Haber)."});
+
+ return{n,emp,hechos:H,resumen:{capital,Ac,Ab,Pc,sTotal,costo,ivaGen:iva(s1)+iva(s2)+iva(s3)+iva(s4)},prod,PV,CL};
+}
