@@ -34,7 +34,7 @@ const NE=1;
 function guardar(){return Store.set(EMP.n,D);}
 function esDoc(){return SES&&SES.rol==="doc";}
 function totalHechos(){return M.hechos.length;}
-function hechosListos(){return M.hechos.filter(h=>T.ok[h.id]||T.seen[h.id]).length;}
+function hechosListos(){return M.hechos.filter(h=>T.ok[h.id]).length;}
 function aprobada(){return D.estaciones[NE].estado==="aprobada";}
 
 function render(){
@@ -109,7 +109,7 @@ function vHechos(){
  const cards=M.hechos.map(h=>{
   const L=lineas(h),done=T.ok[h.id],seen=T.seen[h.id],fb=FB[h.id];
   const opts=sel=>`<option value="">— cuenta —</option>`+PUC_LIST.map(c=>`<option value="${c}" ${sel===c?"selected":""}>${c} · ${PUC[c]}</option>`).join("");
-  const bloq=!!(done||seen);
+  const bloq=!!done;
   const lns=L.map((l,i)=>{
    const cl=fb&&fb.lineOk&&fb.lineOk[i]===true?"ok":(fb&&fb.lineOk&&fb.lineOk[i]===false?"bad":"");
    return`<div class="ln"><select data-h="${h.id}" data-i="${i}" data-f="c" class="${cl}" ${bloq?"disabled":""}>${opts(l.c)}</select>
@@ -126,7 +126,7 @@ function vHechos(){
   ${docHtml(h.doc)}
   <div style="margin-top:10px"><b>Tu asiento:</b>${lns}
   ${bloq?"":`<div class="toolbar"><button class="sec s" data-add="${h.id}">+ línea</button><button data-chk="${h.id}">✔ Revisar</button>${puedeVer?`<button class="gr" data-see="${h.id}">👁 Ver asiento correcto</button>`:""}</div>`}
-  ${msg}${seen||done?(seen&&!done?solHtml(h):""):""}</div></div>`;}).join("");
+  ${msg}${seen&&!done?solHtml(h)+`<div class="note sm">Ahora corrige tu asiento con base en el asiento correcto y pulsa <b>✔ Revisar</b>. El hecho cuenta como terminado cuando tu asiento quede bien.</div>`:""}</div></div>`;}).join("");
  return`<div class="note">Arma un asiento para cada documento. Los valores de tu empresa son distintos a los de tus compañeros.</div>${cards}
  <div class="card c">${hechosListos()===totalHechos()?`<b>🎉 ¡Completaste los ${totalHechos()} asientos!</b><p>Ya puedes presentar la evaluación.</p><button data-t2="eval">Ir a la evaluación →</button>`:`<span class="mu">Te faltan ${totalHechos()-hechosListos()} asientos para abrir la evaluación.</span>`}</div>`;
 }
