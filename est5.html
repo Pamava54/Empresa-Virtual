@@ -233,7 +233,7 @@ function bind(){
  const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
   if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
   let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
-  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now(),det:detEv(EV)});
   if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
   await guardar();keep(render);window.scrollTo(0,0);};
  const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};

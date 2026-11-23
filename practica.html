@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Práctica libre · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script src="fisc.js"></script>
+<script src="estx.js"></script>
+<script>
+/* =====================================================================
+   PRÁCTICA LIBRE · sin nota, repetible
+   1) Nueva ronda: otro mes de operaciones (comercial o de servicios) con datos nuevos.
+   2) Ejercicios rápidos: un tema a la vez, con corrección inmediata.
+   Reutiliza el motor de estx.js (asientos y casillas con cifras).
+   ===================================================================== */
+const MESES=[["noviembre","Noviembre","nov.",2026,"Octubre"],["diciembre","Diciembre","dic.",2026,"Noviembre"],["enero","Enero","ene.",2027,"Diciembre"],["febrero","Febrero","feb.",2027,"Enero"],["marzo","Marzo","mar.",2027,"Febrero"],["abril","Abril","abr.",2027,"Marzo"],["mayo","Mayo","may.",2027,"Abril"],["junio","Junio","jun.",2027,"Mayo"],["julio","Julio","jul.",2027,"Junio"],["agosto","Agosto","ago.",2027,"Julio"],["septiembre","Septiembre","sep.",2027,"Agosto"],["octubre","Octubre","oct.",2027,"Septiembre"]];
+const SV=[["servicios de consultoría y asesoría",["Software Contable del Tolima","Papelería La Esquina","Tecnología y Equipos del Tolima"],["Constructora Horizonte","Obras y Diseños S.A.S."]],
+ ["servicios de estética y belleza",["Cosméticos Belleza Pura","Distribuidora Capilar","Tecnología y Equipos del Tolima"],["Cliente Sandra Díaz","Empresa Eventos Luna"]],
+ ["servicios de entrenamiento y bienestar",["Equipos Fitness Colombia","Distribuidora Vital","Tecnología y Equipos del Tolima"],["Colegio Técnico Industrial","Empresa convenio Textiles"]],
+ ["servicios odontológicos",["Dental Supply S.A.S.","Insumos Médicos del Centro","Tecnología y Equipos del Tolima"],["Medicina prepagada convenio","Empresa convenio Textiles"]],
+ ["servicios de diseño y publicidad",["Papeles del Tolima Ltda.","Importadora Tech Mundo","Tecnología y Equipos del Tolima"],["Restaurante El Fogón","Hotel Real Ibagué"]]];
+const CUENTAS_P=PUCT_LIST;
+let MODO="menu",EJT=null,EJ=null,RD=null,PN=null;
+const rr0=a=>a;
+const r1000=x=>Math.round(x/1000)*1000;
+function seedRnd(seed){const R=mulberry32(seed);return{R,ri:(a,b)=>a+Math.floor(R()*(b-a+1)),pick:a=>a[Math.floor(R()*a.length)]};}
+const iva19=b=>Math.round(b*0.19);
+
+/* ------------------ RONDAS ------------------ */
+function saldos(hechos){const a={};hechos.forEach(h=>h.asiento.forEach(l=>{a[l.c]=(a[l.c]||0)+(l.s==="D"?l.v:-l.v);}));return a;}
+function resumenRonda(hechos){
+ const a=saldos(hechos);let act=0,pas=0,gas=0;
+ Object.keys(a).forEach(c=>{const v=a[c];if(c[0]==="1"||c==="240802")act+=v;else if(c[0]==="2")pas+=-v;else if(c[0]==="5")gas+=v;});
+ const ing=-((a["413595"]||0)+(a["415595"]||0)),cos=a["613595"]||0,un=ing-cos-gas,cap=-(a["310505"]||0);
+ return{ing,cos,gas,un,act,pas,cap,pat:cap+un,cuadra:act===pas+cap+un};
+}
+function docP(tit,num,d,partes,filas,tt,nota){return{tit,num,fecha:dia(d),partes,filas,tot:tt,nota};}
+function genServ(n,r){
+ const{R,ri}=seedRnd(hashStr("serv"+n+"r"+r)),emp=EMPRESAS[n-1],F=SV[(n+r)%SV.length],srv=F[0],PV=F[1],CL=F[2];
+ const tot=b=>b+iva19(b),nit=nitDe;
+ const s1=ri(4,9)*100000,s2=ri(12,25)*100000,s3=ri(5,10)*100000,eq=ri(12,30)*100000,ins=ri(1,3)*100000,arr=ri(3,6)*100000,nom=ri(4,8)*100000,ene=ri(3,9)*10000,net=ri(4,9)*10000,pub=ri(1,2)*100000;
+ const Ac=ri(10,20)*100000,consig=r1000(0.5*(Ac+tot(s1))),cobro=r1000(tot(s2)*0.5),pagoP=r1000(tot(eq)*0.3);
+ const outs=arr+nom+ene+net+pub+pagoP,Ab=Math.ceil((outs+400000)/100000)*100000;
+ let fv=ri(1000,3000),fc=ri(200,800),ce=ri(100,900),rc=ri(300,900);
+ const H=[];const add=h=>{h.id=H.length+1;H.push(h);return h;};const P=(a,b)=>[a,b];
+ const fil=(d,q,u)=>[[d,q,u,q*u]];
+ add({t:"Constitución: aportes de los socios",doc:docP("ACTA DE CONSTITUCIÓN · RECIBO DE APORTES","AC-001",1,[P("Empresa",emp.nombre),P("NIT",emp.nit),P("Socios","Aportes iniciales"),P("Fecha",dia(1))],null,[["Aporte en efectivo (caja)",fmt(Ac)],["Aporte consignado en banco",fmt(Ab)],["Capital total aportado",fmt(Ac+Ab)]]),
+  asiento:[{c:"110505",s:"D",v:Ac},{c:"111005",s:"D",v:Ab},{c:"310505",s:"H",v:Ac+Ab}],pista:"Lo que entra va al Debe (caja y bancos). Lo que aportan los socios se acredita en el capital."});
+ const venta=(d,cli,fp,b,cta,tt)=>({doc:docP("FACTURA DE VENTA","FV-"+(fv++),d,[P("Vendedor",emp.nombre),P("NIT",emp.nit),P("Cliente",cli),P("Forma de pago",fp)],fil("Servicio: "+srv,1,b),[["Subtotal",fmt(b)],["IVA 19%",fmt(iva19(b))],[tt,fmt(tot(b))]]),
+  asiento:[{c:cta,s:"D",v:tot(b)},{c:"415595",s:"H",v:b},{c:"240801",s:"H",v:iva19(b)}]});
+ add({t:"Servicio prestado de contado en efectivo",...venta(3,"Ventas de mostrador","Contado · efectivo",s1,"110505","TOTAL RECIBIDO"),pista:"Entra efectivo (Debe en caja por el total). El ingreso por servicios y el IVA generado van al Haber."});
+ add({t:"Servicio prestado a crédito a "+CL[0],...venta(5,CL[0],"Crédito a 30 días",s2,"130505","TOTAL A COBRAR"),pista:"El cliente queda debiendo el total (Clientes al Debe). Ingreso e IVA generado al Haber."});
+ add({t:"Servicio pagado con datáfono",...venta(8,"Ventas de mostrador","Tarjeta · se abona en el banco",s3,"111005","TOTAL ABONADO AL BANCO"),pista:"Igual que el contado, pero el dinero entra al banco."});
+ add({t:"Pago del arriendo del local",doc:docP("COMPROBANTE DE EGRESO","CE-"+(ce++),9,[P("Pagado a","Inmobiliaria Centro Ibagué"),P("Concepto","Arriendo · "+MESX.nom),P("Medio","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(arr)]]),
+  asiento:[{c:"512010",s:"D",v:arr},{c:"111005",s:"H",v:arr}],pista:"El arriendo es un gasto (Debe). Sale plata del banco (Haber)."});
+ add({t:"Pago de la nómina",doc:docP("PLANILLA DE NÓMINA","NM-"+ri(100,999),12,[P("Empresa",emp.nombre),P("Periodo",MESX.Nom+" "+MESX.anio),P("Medio","Transferencia · "+emp.banco.n),P("Empleados","Personal de la empresa")],null,[["TOTAL SUELDOS PAGADOS",fmt(nom)]],"Para este ejercicio se registra solo el sueldo pagado."),
+  asiento:[{c:"510506",s:"D",v:nom},{c:"111005",s:"H",v:nom}],pista:"Los sueldos son un gasto (Debe) pagado desde el banco (Haber)."});
+ add({t:"Compra de un equipo a crédito",doc:docP("FACTURA DE COMPRA","FC-"+(fc++),14,[P("Proveedor",PV[2]),P("NIT proveedor",nit(PV[2])),P("Comprador",emp.nombre),P("Forma de pago","Crédito a 60 días")],fil("Equipo para la prestación del servicio",1,eq),[["Subtotal",fmt(eq)],["IVA 19%",fmt(iva19(eq))],["TOTAL A PAGAR",fmt(tot(eq))]],"Se usará varios años: es un activo."),
+  asiento:[{c:"152805",s:"D",v:eq},{c:"240802",s:"D",v:iva19(eq)},{c:"220505",s:"H",v:tot(eq)}],pista:"Un equipo que se usa por años es un activo. El IVA es descontable y se debe el total."});
+ add({t:"Pago del servicio de energía",doc:docP("FACTURA DE SERVICIO PÚBLICO","SP-"+ri(10000,99999),16,[P("Empresa de energía","Energía del Tolima S.A. E.S.P."),P("Cliente",emp.nombre),P("Periodo",MESX.ant+"–"+MESX.nom),P("Medio","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(ene)]]),
+  asiento:[{c:"513530",s:"D",v:ene},{c:"111005",s:"H",v:ene}],pista:"Servicios públicos: gasto (Debe) pagado desde el banco (Haber)."});
+ add({t:"Compra de papelería a crédito",doc:docP("FACTURA DE COMPRA","FC-"+(fc++),17,[P("Proveedor",PV[1]),P("NIT proveedor",nit(PV[1])),P("Comprador",emp.nombre),P("Forma de pago","Crédito a 30 días")],fil("Útiles, papelería y fotocopias",1,ins),[["Subtotal",fmt(ins)],["IVA 19%",fmt(iva19(ins))],["TOTAL A PAGAR",fmt(tot(ins))]]),
+  asiento:[{c:"519530",s:"D",v:ins},{c:"240802",s:"D",v:iva19(ins)},{c:"220505",s:"H",v:tot(ins)}],pista:"Gasto de papelería (Debe), IVA descontable (Debe) y se debe el total (Haber)."});
+ add({t:"Pago de publicidad",doc:docP("COMPROBANTE DE EGRESO","CE-"+(ce++),19,[P("Pagado a","Agencia Creativa del Tolima"),P("Concepto","Publicidad y propaganda"),P("Medio","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(pub)]]),
+  asiento:[{c:"523560",s:"D",v:pub},{c:"111005",s:"H",v:pub}],pista:"La publicidad es un gasto de ventas (Debe) pagado desde el banco (Haber)."});
+ add({t:"Consignación de efectivo al banco",doc:docP("VOLANTE DE CONSIGNACIÓN","VC-"+ri(1000,9999),20,[P("Banco",emp.banco.n),P("Cuenta",emp.cuenta),P("Titular",emp.nombre),P("Concepto","Consignación en efectivo")],null,[["VALOR CONSIGNADO",fmt(consig)]]),
+  asiento:[{c:"111005",s:"D",v:consig},{c:"110505",s:"H",v:consig}],pista:"Es un movimiento entre dos cuentas de la empresa: entra al banco (Debe) y sale de la caja (Haber)."});
+ add({t:"Cobro parcial a "+CL[0],doc:docP("RECIBO DE CAJA","RC-"+(rc++),23,[P("Recibido de",CL[0]),P("Concepto","Abono a la factura "+H[2].doc.num),P("Medio","Transferencia a "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR RECIBIDO",fmt(cobro)]],"Es un abono: el cliente aún debe el resto."),
+  asiento:[{c:"111005",s:"D",v:cobro},{c:"130505",s:"H",v:cobro}],pista:"Entra plata al banco (Debe) y la deuda del cliente baja (Clientes al Haber)."});
+ add({t:"Abono al proveedor del equipo",doc:docP("COMPROBANTE DE EGRESO","CE-"+(ce++),25,[P("Pagado a",PV[2]),P("Concepto","Abono a la factura "+H[6].doc.num),P("Medio","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR DEL ABONO",fmt(pagoP)]]),
+  asiento:[{c:"220505",s:"D",v:pagoP},{c:"111005",s:"H",v:pagoP}],pista:"La deuda baja (Proveedores al Debe) y sale plata del banco (Haber)."});
+ add({t:"Pago de internet y teléfono",doc:docP("FACTURA DE SERVICIO","SP-"+ri(10000,99999),27,[P("Empresa","Comunicaciones del Centro S.A."),P("Cliente",emp.nombre),P("Servicio","Internet y telefonía"),P("Medio","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(net)]]),
+  asiento:[{c:"513535",s:"D",v:net},{c:"111005",s:"H",v:net}],pista:"Gasto de internet y teléfono (Debe) pagado desde el banco (Haber)."});
+ return{tipo:"servicios",titulo:"Empresa de servicios · "+srv,hechos:H};
+}
+function genRonda(tipo,r,n){
+ const m=MESES[(r-1)%MESES.length];Object.assign(MESX,{nom:m[0],Nom:m[1],abr:m[2],anio:m[3],ant:m[4],ronda:r});
+ let hechos,titulo;
+ if(tipo==="servicios"){const g=genServ(n,r);hechos=g.hechos;titulo=g.titulo;}
+ else{const M=generarMes(n);hechos=M.hechos.map(h=>({id:h.id,t:h.t,doc:h.doc,asiento:h.asiento,pista:h.pista}));titulo="Empresa comercial · "+M.prod;}
+ return{tipo,r,mes:m[1]+" de "+m[3],titulo,hechos,res:resumenRonda(hechos)};
+}
+
+/* ------------------ EJERCICIOS RÁPIDOS ------------------ */
+const NM=["la mercancía","los cuadernos","las camisetas","los repuestos","los cargadores","los insumos"];
+function ejAsiento(seed){
+ const{ri,pick}=seedRnd(seed),b=ri(2,30)*100000,iv=iva19(b),t=b+iv,pr=pick(NM),v=ri(1,9)*100000;
+ const C=[
+  {e:"Compraste "+pr+" a crédito por "+fmt(b)+" más IVA del 19 %.",a:[{c:"143505",s:"D",v:b},{c:"240802",s:"D",v:iv},{c:"220505",s:"H",v:t}],p:"Mercancía por su valor sin IVA (Debe), IVA descontable (Debe) y se debe el total (Proveedores, Haber)."},
+  {e:"Vendiste "+pr+" de contado en efectivo por "+fmt(b)+" más IVA del 19 %.",a:[{c:"110505",s:"D",v:t},{c:"413595",s:"H",v:b},{c:"240801",s:"H",v:iv}],p:"Entra efectivo por el total (Debe). El ingreso y el IVA generado van al Haber."},
+  {e:"Vendiste "+pr+" a crédito por "+fmt(b)+" más IVA del 19 %.",a:[{c:"130505",s:"D",v:t},{c:"413595",s:"H",v:b},{c:"240801",s:"H",v:iv}],p:"El cliente queda debiendo el total (Clientes al Debe)."},
+  {e:"Pagaste el arriendo del mes por transferencia: "+fmt(v)+".",a:[{c:"512010",s:"D",v:v},{c:"111005",s:"H",v:v}],p:"El arriendo es un gasto (Debe); sale plata del banco (Haber)."},
+  {e:"Un cliente te abonó "+fmt(v)+" a su deuda, con una transferencia al banco.",a:[{c:"111005",s:"D",v:v},{c:"130505",s:"H",v:v}],p:"Entra plata al banco (Debe) y baja lo que debe el cliente (Haber)."},
+  {e:"Le pagaste "+fmt(v)+" en efectivo a un proveedor, abono a una factura pendiente.",a:[{c:"220505",s:"D",v:v},{c:"110505",s:"H",v:v}],p:"Baja la deuda (Proveedores al Debe) y sale efectivo (Caja al Haber)."},
+  {e:"Consignaste "+fmt(v)+" de la caja en la cuenta bancaria.",a:[{c:"111005",s:"D",v:v},{c:"110505",s:"H",v:v}],p:"Entra al banco (Debe) y sale de la caja (Haber)."},
+  {e:"Compraste un computador de contado con cheque por "+fmt(b)+" más IVA del 19 %.",a:[{c:"152805",s:"D",v:b},{c:"240802",s:"D",v:iv},{c:"111005",s:"H",v:t}],p:"Equipo (activo) por su valor sin IVA, IVA descontable y sale del banco el total."},
+  (()=>{const bb=ri(8,30)*100000,i2=iva19(bb),rf=Math.round(bb*0.025),ic=Math.round(bb*0.007);return{e:"Compraste mercancía a crédito por "+fmt(bb)+" más IVA del 19 %. Retienes 2,5 % de retención en la fuente y 0,7 % de ReteICA sobre la base.",a:[{c:"143505",s:"D",v:bb},{c:"240802",s:"D",v:i2},{c:"236540",s:"H",v:rf},{c:"236801",s:"H",v:ic},{c:"220505",s:"H",v:bb+i2-rf-ic}],p:"Las retenciones van al Haber; al proveedor se le debe el total menos las retenciones."};})(),
+  (()=>{const eq=ri(12,36)*100000,m=36,d=Math.round(eq/m);return{e:"Un equipo de "+fmt(eq)+" se deprecia en "+m+" meses por línea recta. Registra la depreciación de un mes.",a:[{c:"516020",s:"D",v:d},{c:"159220",s:"H",v:d}],p:"Depreciación = costo ÷ meses. Gasto (Debe) y depreciación acumulada (Haber)."};})(),
+  {e:"Se causa la nómina de un mes: sueldos de "+fmt(v*3)+", sin descuentos para este ejercicio. Aún no se paga.",a:[{c:"510506",s:"D",v:v*3},{c:"250505",s:"H",v:v*3}],p:"Gasto de sueldos (Debe) y salarios por pagar (Haber)."}
+ ];
+ const c=C[ri(0,C.length-1)];
+ return{tipo:"as",enun:c.e,item:{id:"x",t:"Contabiliza este hecho",asiento:c.a,pista:c.p}};
+}
+function ejKardex(seed){
+ const{ri}=seedRnd(seed),q1=ri(10,40),u1=ri(5,30)*1000,q2=ri(10,40),u2=u1+ri(-3,6)*1000,q3=ri(5,Math.min(q1+q2-1,60));
+ const sq=q1+q2,sv=q1*u1+q2*u2,pm=Math.round(sv/sq),cv=q3*pm;
+ return{tipo:"form",enun:`Un negocio tiene un inventario <b>sin saldo inicial</b>. Compra <b>${q1}</b> unidades a <b>${fmt(u1)}</b> cada una y luego <b>${q2}</b> unidades a <b>${fmt(u2)}</b> cada una. Después vende <b>${q3}</b> unidades. Usa el <b>promedio ponderado</b> (redondea el costo promedio al peso).`,
+  pista:"Promedio = (valor total de las compras) ÷ (unidades totales). La salida sale al promedio. El saldo final = saldo en valor − costo de la salida.",
+  groups:[{titulo:"Kardex",fields:[{k:"sq",lab:"Unidades en inventario tras las dos compras",raw:1,exp:()=>sq},{k:"pm",lab:"Costo unitario promedio",exp:()=>pm},{k:"cv",lab:"Costo de la venta (salida)",exp:()=>cv},{k:"sf",lab:"Saldo final en valor",exp:()=>sv-cv}]}],
+  expl:"Promedio = "+fmt(sv)+" ÷ "+sq+" = "+fmt(pm)+". Costo de la venta = "+q3+" × "+fmt(pm)+" = "+fmt(cv)+". Saldo final = "+fmt(sv)+" − "+fmt(cv)+" = "+fmt(sv-cv)+"."};
+}
+function ejConcil(seed){
+ const{ri}=seedRnd(seed),L=ri(20,90)*100000,nd=ri(8,40)*1000,nc=ri(2,12)*1000,ch=ri(2,12)*100000,tr=ri(2,10)*100000,E=L-nd+nc+ch-tr,conc=L-nd+nc;
+ return{tipo:"form",enun:`El <b>extracto del banco</b> a fin de mes dice <b>${fmt(E)}</b>. Tu <b>libro de bancos</b> dice <b>${fmt(L)}</b>. Revisas y encuentras: un <b>cheque girado no cobrado</b> de ${fmt(ch)}, una <b>consignación en tránsito</b> de ${fmt(tr)}, una <b>nota débito</b> del banco por ${fmt(nd)} (cuota de manejo) y una <b>nota crédito</b> por ${fmt(nc)} (intereses).`,
+  pista:"Del lado del extracto: saldo − cheques pendientes + consignaciones en tránsito. Del lado de los libros: saldo − nota débito + nota crédito. Ambos deben dar igual.",
+  groups:[{titulo:"Conciliación",fields:[{k:"c1",lab:"Saldo conciliado (extracto − cheque + consignación)",exp:()=>E-ch+tr},{k:"c2",lab:"Saldo conciliado en libros (− ND + NC)",exp:()=>conc},{k:"nd",lab:"¿La nota débito se contabiliza?",sel:[["","—"],["s","Sí: hay que registrarla en libros"],["n","No: es una partida del banco"]],exp:()=>"s"}]}],
+  expl:"Extracto: "+fmt(E)+" − "+fmt(ch)+" + "+fmt(tr)+" = "+fmt(E-ch+tr)+". Libros: "+fmt(L)+" − "+fmt(nd)+" + "+fmt(nc)+" = "+fmt(conc)+". Las notas débito y crédito se contabilizan porque la empresa no las conocía; el cheque y la consignación en tránsito solo se concilian."};
+}
+function ejIva(seed){
+ const{ri}=seedRnd(seed),V=ri(10,40)*100000,C=ri(10,40)*100000,Eq=ri(0,1)?ri(5,20)*100000:0,g=iva19(V),d=iva19(C)+iva19(Eq),s=g-d;
+ return{tipo:"form",enun:`En el mes tuviste ventas por <b>${fmt(V)}</b>, compras de mercancía por <b>${fmt(C)}</b>${Eq?` y la compra de un equipo por <b>${fmt(Eq)}</b>`:""}. Todos los valores son <b>sin IVA</b> y la tarifa es del 19 %.`,
+  pista:"IVA generado = ventas × 19 %. IVA descontable = (compras + equipo) × 19 %. Si lo generado es mayor, hay saldo a pagar; si no, saldo a favor.",
+  groups:[{titulo:"IVA del mes",fields:[{k:"g",lab:"IVA generado",exp:()=>g},{k:"d",lab:"IVA descontable",exp:()=>d},{k:"t",lab:"Resultado",sel:[["","—"],["p","Saldo a pagar"],["f","Saldo a favor"]],exp:()=>s>=0?"p":"f"},{k:"v",lab:"Valor del saldo (sin signo)",exp:()=>Math.abs(s)}]}],
+  expl:"Generado "+fmt(g)+" − descontable "+fmt(d)+" = "+fmt(s)+(s>=0?" → saldo a pagar.":" → saldo a favor de "+fmt(-s)+".")};
+}
+function ejRet(seed){
+ const{ri}=seedRnd(seed),b=[ri(1,4)*100000,ri(6,20)*100000,ri(8,30)*100000],rf=b.map(x=>x>=FISC.minBase?Math.round(x*FISC.tarCompras):0),ic=b.map(x=>x>=FISC.minBase?Math.round(x*FISC.tarIca):0);
+ return{tipo:"form",enun:`Compraste mercancía a tres proveedores, con bases (sin IVA) de <b>${fmt(b[0])}</b>, <b>${fmt(b[1])}</b> y <b>${fmt(b[2])}</b>. Todos son declarantes de renta. Recuerda: base mínima <b>${fmt(FISC.minBase)}</b> (10 UVT), retención en la fuente <b>2,5 %</b> y ReteICA <b>0,7 %</b> cuando se retiene.`,
+  pista:"Si la base no llega a la base mínima no hay retención. Si llega: base × 2,5 % (fuente) y base × 0,7 % (ReteICA).",
+  groups:[{titulo:"Retenciones",fields:[{k:"r0",lab:"Retención en la fuente · compra 1",exp:()=>rf[0]},{k:"r1",lab:"Retención en la fuente · compra 2",exp:()=>rf[1]},{k:"r2",lab:"Retención en la fuente · compra 3",exp:()=>rf[2]},{k:"ic",lab:"ReteICA total de las 3 compras",exp:()=>ic[0]+ic[1]+ic[2]}]}],
+  expl:b.map((x,i)=>"Compra "+(i+1)+": "+(rf[i]?fmt(x)+" × 2,5 % = "+fmt(rf[i]):"no llega a "+fmt(FISC.minBase)+", no se retiene")).join(" · ")};
+}
+function ejNom(seed){
+ const{ri}=seedRnd(seed),sal=ri(0,1)?FISC.smmlv:Math.round(FISC.smmlv*(1.1+ri(0,150)/100)/50000)*50000;
+ const aux=sal<=2*FISC.smmlv?FISC.aux:0,dev=sal+aux,sa=Math.round(sal*0.04),pe=Math.round(sal*0.12),ces=Math.round(dev*FISC.ces);
+ return{tipo:"form",enun:`Un trabajador gana <b>${fmt(sal)}</b> al mes y trabajó los 30 días. Auxilio de transporte 2026: <b>${fmt(FISC.aux)}</b> (solo hasta 2 salarios mínimos de ${fmt(2*FISC.smmlv)}). Salud y pensión del trabajador: 4 % cada una sobre el sueldo.`,
+  pista:"Auxilio solo si el sueldo es de hasta 2 SMMLV. Neto = sueldo + auxilio − 4 % salud − 4 % pensión. Pensión del empleador = 12 % del sueldo. Cesantías = 8,33 % de sueldo + auxilio.",
+  groups:[{titulo:"Liquidación",fields:[{k:"a",lab:"Auxilio de transporte",exp:()=>aux},{k:"n",lab:"Neto a pagar",exp:()=>dev-2*sa,tol:1},{k:"p",lab:"Pensión del empleador (12 %)",exp:()=>pe,tol:1},{k:"c",lab:"Cesantías del mes (8,33 %)",exp:()=>ces,tol:1}]}],
+  expl:"Auxilio: "+(aux?"gana hasta 2 SMMLV, sí recibe "+fmt(aux):"gana más de 2 SMMLV, no recibe")+". Neto = "+fmt(dev)+" − "+fmt(2*sa)+" = "+fmt(dev-2*sa)+". Pensión empleador "+fmt(pe)+". Cesantías 8,33 % × "+fmt(dev)+" = "+fmt(ces)+"."};
+}
+function ejDep(seed){
+ const{ri}=seedRnd(seed),c=ri(12,60)*100000,m=ri(3,10)*12,k=ri(2,Math.min(m-1,18)),cuota=Math.round(c/m);
+ return{tipo:"form",enun:`Compraste un equipo por <b>${fmt(c)}</b> con una vida útil de <b>${m} meses</b> y sin valor residual (línea recta). Han pasado <b>${k} meses</b> desde la compra.`,
+  pista:"Cuota mensual = costo ÷ meses. Depreciación acumulada = cuota × meses transcurridos. Valor en libros = costo − depreciación acumulada.",
+  groups:[{titulo:"Depreciación",fields:[{k:"q",lab:"Cuota de depreciación mensual",exp:()=>cuota},{k:"ac",lab:"Depreciación acumulada a hoy",exp:()=>cuota*k,tol:k},{k:"vl",lab:"Valor en libros hoy",exp:()=>c-cuota*k,tol:k}]}],
+  expl:"Cuota = "+fmt(c)+" ÷ "+m+" = "+fmt(cuota)+". Acumulada = "+fmt(cuota)+" × "+k+" = "+fmt(cuota*k)+". Valor en libros = "+fmt(c-cuota*k)+"."};
+}
+function ejCierre(seed){
+ const{ri}=seedRnd(seed),I=ri(30,90)*100000,C=Math.round(I*(0.5+ri(0,15)/100)/1000)*1000,G=Math.round(I*(0.12+ri(0,8)/100)/1000)*1000,ub=I-C,uop=ub-G,imp=Math.round(uop*FISC.renta),un=uop-imp;
+ return{tipo:"form",enun:`En el mes tuviste ingresos por <b>${fmt(I)}</b>, costo de ventas de <b>${fmt(C)}</b> y gastos operacionales de <b>${fmt(G)}</b>. La tarifa de renta es del <b>35 %</b>.`,
+  pista:"Utilidad bruta = ingresos − costo. Utilidad antes de impuestos = bruta − gastos. Impuesto = esa utilidad × 35 %. Utilidad neta = antes de impuestos − impuesto.",
+  groups:[{titulo:"Resultado del período",fields:[{k:"ub",lab:"Utilidad bruta",exp:()=>ub},{k:"uop",lab:"Utilidad antes de impuestos",exp:()=>uop},{k:"imp",lab:"Impuesto de renta (35 %)",exp:()=>imp},{k:"un",lab:"Utilidad neta",exp:()=>un}]}],
+  expl:"Bruta "+fmt(ub)+"; antes de impuestos "+fmt(uop)+"; impuesto "+fmt(imp)+"; utilidad neta "+fmt(un)+"."};
+}
+const TEMAS=[
+ {id:"asiento",ic:"🧾",t:"Asientos contables",d:"Un hecho económico, tú armas el asiento",f:ejAsiento},
+ {id:"kardex",ic:"📦",t:"Kardex (promedio ponderado)",d:"Dos compras y una venta",f:ejKardex},
+ {id:"concil",ic:"🏦",t:"Conciliación bancaria",d:"Extracto vs libros",f:ejConcil},
+ {id:"iva",ic:"🧮",t:"IVA del mes",d:"Generado, descontable y saldo",f:ejIva},
+ {id:"ret",ic:"💸",t:"Retención en la fuente y ReteICA",d:"Con base mínima",f:ejRet},
+ {id:"nom",ic:"👥",t:"Nómina de un trabajador",d:"Auxilio, neto, aportes y cesantías",f:ejNom},
+ {id:"dep",ic:"🖥",t:"Depreciación",d:"Cuota, acumulada y valor en libros",f:ejDep},
+ {id:"cierre",ic:"🔒",t:"Resultado y cierre",d:"Utilidad bruta, impuesto y utilidad neta",f:ejCierre}
+];
+
+/* ------------------ estado y estadísticas ------------------ */
+function stats(){const s=T.st=T.st||{n:0,p1:0,racha:0,mejor:0,por:{}};return s;}
+function statsUpdate(){
+ if(!EJ||EJ.contado)return;
+ const id=EJ.tipo==="as"?"ejas":"ejf";
+ if(T[id]&&T[id].ok){EJ.contado=1;const s=stats(),pr=s.por[EJT]=s.por[EJT]||{n:0,p1:0};
+  const prim=((T[id].tries||0)===0)&&!Object.keys(T[id].it||{}).some(k=>T[id].it[k]>0)&&!Object.keys(T[id].is||{}).length&&!T[id].seen;
+  s.n++;pr.n++;if(prim){s.p1++;pr.p1++;s.racha++;if(s.racha>s.mejor)s.mejor=s.racha;}else s.racha=0;guardar();}
+}
+verOk=function(o){return !o.ok&&!o.seen&&((o.tries||0)>=1||esDoc());};   // en práctica se puede ver la solución desde el primer fallo
+
+function nuevoEj(){
+ const t=TEMAS.find(x=>x.id===EJT);EJ=t.f(Date.now()%2147483647+Math.floor(Math.random()*1e6));
+ T.ejas={};T.ejf={};FB={};
+ if(EJ.tipo==="as"){X.defs.ejas={tipo:"as",items:()=>[EJ.item],cuentas:CUENTAS_P,intro:""};}
+ else{X.defs.ejf={tipo:"form",groups:()=>EJ.groups,pista:EJ.pista,intro:"",okMsg:()=>EJ.expl};}
+}
+
+/* ------------------ vistas ------------------ */
+function cab(){
+ return`<div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <div class="toolbar">${MODO!=="menu"?`<button class="sec" data-go="menu">← Menú de práctica</button>`:""}<button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: práctica con la empresa ${EMP.n}.</div>`:""}`;
+}
+function vMenu(){
+ const s=stats();
+ return`<div class="card"><h2>🧪 Práctica libre</h2><p class="mu">Aquí no hay notas ni bloqueos: practica las veces que quieras. Tus resultados no afectan tu ruta.</p>
+  <span class="streak">✔ ${s.n} ejercicios resueltos</span> <span class="streak">🔥 racha ${s.racha} · mejor ${s.mejor}</span></div>
+ <div class="card"><h3>📅 Nueva ronda del mes</h3><p class="sm mu">Un mes completo de operaciones con datos nuevos, como la estación 1. Cada ronda cambia los valores y el mes. Llevas <b>${T.rnum||0}</b> ronda(s).${T.ronda?` Tienes una ronda en curso: <b>${esc(RD.mes)}</b> · ${esc(RD.titulo)}.`:""}</p>
+  <div class="toolbar">${T.ronda?`<button data-go="ronda">Continuar mi ronda →</button>`:""}<button class="${T.ronda?"gr":""}" data-nr="comercial">🛒 Nueva ronda · empresa comercial</button><button class="${T.ronda?"gr":""}" data-nr="servicios">💇 Nueva ronda · empresa de servicios</button></div></div>
+ <div class="card"><h3>⚡ Ejercicios rápidos (5 minutos)</h3><p class="sm mu">Elige un tema: cada ejercicio es nuevo y se corrige al instante.</p>
+  <div class="tema">${TEMAS.map(t=>{const p=(s.por[t.id]||{n:0});return`<button data-ej="${t.id}">${t.ic} ${t.t}<small>${t.d}${p.n?` · ${p.n} resueltos`:""}</small></button>`;}).join("")}</div></div>`;
+}
+function vRonda(){
+ const nl=RD.hechos.filter(h=>T.ronda.iok&&T.ronda.iok[h.id]).length,tt=RD.hechos.length;
+ return`<div class="card"><h2>📅 Ronda ${RD.r} · ${esc(RD.mes)}</h2><div class="sm mu">${esc(EMP.nombre)} · ${esc(RD.titulo)}</div>
+  <div class="sm mu" style="margin-top:6px">Asientos correctos: ${nl} de ${tt}</div><div class="bar"><i style="width:${nl/tt*100}%"></i></div></div>
+ <div class="toolbar"><button class="${TAB==="ronda"?"":"gr"}" data-go="ronda">🧾 Asientos</button><button class="${TAB==="res"?"":"gr"}" data-go="res">📊 Resultados del mes${T.rres&&T.rres.ok?" ✅":""}</button></div>
+ ${TAB==="res"?vResRonda():vAs("ronda",X.defs.ronda,T.ronda,"res","Ir a los resultados →")}`;
+}
+function vResRonda(){
+ if(!(T.ronda.ok)&&!esDoc())return`<div class="card"><h3>🔒 Primero termina los asientos</h3><p class="mu">Te faltan ${RD.hechos.length-RD.hechos.filter(h=>T.ronda.iok&&T.ronda.iok[h.id]).length}.</p></div>`;
+ T.rres=T.rres||{};const body=vForm("rres",X.defs.rres,T.rres,"menu","Terminar y volver al menú →");
+ return body+(T.rres.ok?`<div class="card c"><button data-nr="${RD.tipo}">📅 Nueva ronda del mismo tipo</button></div>`:"");
+}
+function vEj(){
+ const t=TEMAS.find(x=>x.id===EJT),s=stats();
+ const cuerpo=EJ.tipo==="as"?vAs("ejas",X.defs.ejas,T.ejas,"otro","Otro ejercicio →"):vForm("ejf",X.defs.ejf,T.ejf,"otro","Otro ejercicio →");
+ return`<div class="card"><h2>${t.ic} ${t.t}</h2><div class="enun">${EJ.enun}</div><div style="margin-top:6px"><span class="streak">✔ ${s.n} resueltos</span> <span class="streak">🔥 racha ${s.racha}</span></div></div>${cuerpo}
+  ${(T[EJ.tipo==="as"?"ejas":"ejf"].ok&&EJ.expl)?`<div class="note sm">💡 ${EJ.expl}</div>`:""}
+  <div class="toolbar"><button class="gr" data-go="otro">↻ Cambiar de ejercicio</button></div>`;
+}
+
+function render(){
+ if(TAB==="otro"){nuevoEj();MODO="ej";TAB="ej";}
+ if(TAB==="menu")MODO="menu";
+ statsUpdate();
+ let body="";
+ if(MODO==="menu")body=vMenu();
+ else if(MODO==="ronda")body=vRonda();
+ else body=vEj();
+ $("#app").innerHTML=cab()+body+`<div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ bindX();
+ document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{const g=b.dataset.go;
+  if(g==="menu"){MODO="menu";TAB="menu";}
+  else if(g==="ronda"||g==="res"){MODO="ronda";TAB=g;}
+  else if(g==="otro"){nuevoEj();MODO="ej";TAB="ej";}
+  render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-ej]").forEach(b=>b.onclick=()=>{EJT=b.dataset.ej;nuevoEj();MODO="ej";TAB="ej";render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-nr]").forEach(b=>b.onclick=async()=>{
+  if(T.ronda&&!T.rres?.ok&&!confirm("Tienes una ronda en curso. Si generas otra, la actual se descarta. ¿Continuar?"))return;
+  await iniciarRonda(b.dataset.nr);});
+}
+
+async function iniciarRonda(tipo){
+ T.rnum=(T.rnum||0)+1;T.rtipo=tipo;T.ronda={a:{},iok:{},it:{},is:{}};T.rres={};
+ await guardar();cargarRonda();MODO="ronda";TAB="ronda";FB={};render();window.scrollTo(0,0);
+}
+function cargarRonda(){
+ if(!T.ronda||!T.rnum)return;
+ RD=genRonda(T.rtipo||"comercial",T.rnum,EMP.n);
+ X.defs.ronda={tipo:"as",items:()=>RD.hechos.map(h=>({id:String(h.id),t:"Hecho "+h.id+" · "+h.t,doc:h.doc,asiento:h.asiento,pista:h.pista})),cuentas:CUENTAS_P,intro:"Arma un asiento para cada documento de este mes. Esta ronda no tiene nota: practica hasta que te salga bien."};
+ const r=RD.res,com=RD.tipo==="comercial";
+ X.defs.rres={tipo:"form",intro:"Con tus asientos, calcula el resultado de "+RD.mes.toLowerCase()+". (Ingresos sin IVA; el costo de ventas es el del último hecho del mes.)",pista:"Utilidad = ingresos − costo de ventas − gastos. Activos: caja, bancos, clientes, inventarios, equipos e IVA descontable. Pasivos: proveedores e IVA generado, y lo que se deba. Patrimonio = capital + utilidad.",
+  okMsg:()=>"¡Excelente! Utilidad de "+fmt(r.un)+" y balance cuadrado: activos "+fmt(r.act)+" = pasivos "+fmt(r.pas)+" + patrimonio "+fmt(r.pat)+".",
+  groups:()=>[{titulo:"Estado de resultados",fields:[{k:"ing",lab:"Ingresos por "+(com?"ventas":"servicios")+" (sin IVA)",exp:()=>r.ing}].concat(com?[{k:"cos",lab:"Costo de ventas",exp:()=>r.cos}]:[]).concat([{k:"gas",lab:"Total gastos operacionales y de ventas",exp:()=>r.gas},{k:"un",lab:"Utilidad del mes",exp:()=>r.un}])},
+   {titulo:"Situación financiera",fields:[{k:"act",lab:"Total activos",exp:()=>r.act},{k:"pas",lab:"Total pasivos",exp:()=>r.pas},{k:"pat",lab:"Patrimonio (capital + utilidad)",exp:()=>r.pat}]}]};
+}
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ T=D.trabajo.prac=D.trabajo.prac||{};
+ if(T.ronda)cargarRonda();
+ render();
+})();
+</script>
+</body>
+</html>

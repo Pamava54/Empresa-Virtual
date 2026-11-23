@@ -188,8 +188,8 @@ function vEval(){
  if(EV.fin){const nota=EV.nota,pasa=nota>=CFG.notaMinima;
   const notas=Object.values(D.estaciones).filter(x=>x.estado==="aprobada"&&x.nota!=null).map(x=>Number(x.nota));
   const prom=notas.length?(notas.reduce((a,b)=>a+b,0)/notas.length):nota;
-  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎓 ¡Completaste la Empresa Virtual PAMAVA!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
-  <p class="mu">${pasa?"Llevaste un mes completo de tu empresa: desde el primer asiento hasta el software contable. Promedio de tus estaciones: <b>"+prom.toFixed(1)+"</b>.":"Repasa tu simulador y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎉 ¡Aprobaste la estación 6!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Llevaste un mes completo de tu empresa: desde el primer asiento hasta el software contable. Promedio hasta ahora: <b>"+prom.toFixed(1)+"</b>. Se abrió la estación 7 · IVA y retenciones.":"Repasa tu simulador y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
   <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-open="1">Abrir el simulador</button></div></div>`;}
  return`<div class="card"><h3>📝 Evaluación final · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre lo que hiciste en el simulador con tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>${EV.fin?res:""}${qs}${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
 }
@@ -208,7 +208,7 @@ function bind(){
  const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
   if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
   let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
-  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now(),det:detEv(EV)});
   if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
   await guardar();keep(render);window.scrollTo(0,0);};
  const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};

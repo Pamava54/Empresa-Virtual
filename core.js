@@ -22,7 +22,10 @@ const ESTACIONES=[
  {n:3,ic:"🏦",t:"Conciliación bancaria",d:"Concilia el extracto del banco con tu libro de bancos."},
  {n:4,ic:"📦",t:"Inventarios y compras",d:"Lleva el kardex y controla las compras del mes."},
  {n:5,ic:"📊",t:"Estados financieros",d:"Arma los estados financieros con tu balance de prueba."},
- {n:6,ic:"💻",t:"Simulador contable PAMAVA",d:"Registra todo el mes en el programa contable."}
+ {n:6,ic:"💻",t:"Simulador contable PAMAVA",d:"Registra todo el mes en el programa contable."},
+ {n:7,ic:"💸",t:"IVA y retenciones",d:"Calcula retención en la fuente y ReteICA, contabilízalas y arma tu resumen de IVA."},
+ {n:8,ic:"👥",t:"Nómina y seguridad social",d:"Liquida la nómina, los aportes y las prestaciones sociales, y contabilízalas."},
+ {n:9,ic:"🔒",t:"Ajustes y cierre del período",d:"Registra los ajustes de fin de mes y cierra la contabilidad."}
 ];
 
 /* 20 empresas fijas para estudiantes (+ la 21, de práctica del docente) */
@@ -117,6 +120,8 @@ function normalizar(d){
   if(e.nota===undefined)e.nota=null;
   if(!Array.isArray(e.intentos))e.intentos=e.intentos?Object.values(e.intentos):[];
  });
+ /* si una estación ya está aprobada y la siguiente quedó bloqueada (datos anteriores a la ampliación), se abre */
+ for(let k=2;k<=ESTACIONES.length;k++){if(d.estaciones[k-1].estado==="aprobada"&&d.estaciones[k].estado==="bloqueada")d.estaciones[k].estado="abierta";}
  d.trabajo=d.trabajo||{};
  d.alumno=d.alumno||"";
  return d;
@@ -127,7 +132,7 @@ function nuevoEstado(){
 }
 async function cargar(n){let d=await Store.get(n);if(!d){d=nuevoEstado();await Store.set(n,d);}return normalizar(d);}
 function progreso(d){return ESTACIONES.filter(s=>d.estaciones[s.n]&&d.estaciones[s.n].estado==="aprobada").length;}
-function actual(d){const s=ESTACIONES.find(x=>d.estaciones[x.n].estado==="abierta");return s?s.n:(progreso(d)===6?7:0);}
+function actual(d){const s=ESTACIONES.find(x=>d.estaciones[x.n].estado==="abierta");return s?s.n:(progreso(d)===ESTACIONES.length?ESTACIONES.length+1:0);}
 function aprobar(d,n,nota){
  const e=d.estaciones[n];e.estado="aprobada";e.nota=nota;
  const sig=d.estaciones[n+1];if(sig&&sig.estado==="bloqueada")sig.estado="abierta";
@@ -141,3 +146,6 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function fmt(n){const s=String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g,".");return(n<0?"-":"")+"$"+s;}
 function parseM(s){if(s==null)return 0;s=String(s).trim();if(!s)return 0;const d=s.replace(/[^\d]/g,"");return d?parseInt(d,10):0;}
+
+/* ---- detalle de una evaluación (para el reporte del docente): texto sin cifras + acierto ---- */
+function detEv(EV){return EV.qs.map((q,i)=>({k:EV.v+(i+1),t:String(q.t).replace(/[A-Z]{2,3}-\d+/g,"#").replace(/\$\s?\d[\d\.,]*/g,"#").replace(/\b\d{1,3}(?:\.\d{3})+\b/g,"#").replace(/\b(?!20\d\d\b)\d{4,}\b/g,"#").slice(0,120),ok:(EV.ans[i]!==undefined&&q.o[EV.ans[i]]&&q.o[EV.ans[i]].ok)?1:0}));}

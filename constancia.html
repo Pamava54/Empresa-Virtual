@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Constancia · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.cert{background:#fff;border:3px double #1d4ed8;border-radius:10px;max-width:900px;margin:10px auto;padding:34px 40px;text-align:center;position:relative}
+.cert .mk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:88px;font-weight:800;color:rgba(29,78,216,.06);transform:rotate(-20deg);pointer-events:none;white-space:nowrap}
+.cert h1{font-size:30px;color:#1d4ed8;margin:6px 0}
+.cert .nm{font-size:30px;font-weight:800;border-bottom:2px solid #c7d2e0;display:inline-block;padding:0 24px;margin:8px 0}
+.cert table{margin:14px auto;max-width:640px;text-align:left}
+.cert .fm{display:flex;justify-content:space-around;margin-top:34px;gap:20px}
+.cert .fm div{flex:1;border-top:1.5px solid #6b7280;padding-top:4px;font-size:13px}
+@media print{body{background:#fff}.noprint{display:none!important}.wm{display:none}#app{max-width:none;padding:0}.cert{margin:0;border-radius:0;page-break-inside:avoid}@page{size:letter landscape;margin:10mm}}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script>
+(async()=>{
+ await Store.init();
+ const ses=sesionGet();
+ if(!ses||(!ses.n&&ses.rol!=="doc")){location.href="index.html";return;}
+ const q=new URLSearchParams(location.search);
+ const n=(ses.rol==="doc"&&q.get("n"))?+q.get("n"):ses.n;
+ if(!n||n<1||n>EMPRESAS.length){location.href="index.html";return;}
+ const emp=EMPRESAS[n-1],d=await cargar(n);
+ const apr=progreso(d),todo=apr===ESTACIONES.length;
+ const notas=ESTACIONES.map(s=>d.estaciones[s.n]);
+ const prom=todo?notas.reduce((a,e)=>a+Number(e.nota),0)/notas.length:null;
+ let fin=0;notas.forEach(e=>(e.intentos||[]).forEach(i=>{if(i.fecha>fin)fin=i.fecha;}));
+ const f=fin?new Date(fin):new Date();
+ const fch=f.toLocaleDateString("es-CO",{day:"numeric",month:"long",year:"numeric"});
+ const cod="EV-"+hashStr(d.alumno+"|"+emp.nombre+"|"+notas.map(e=>e.nota).join(",")).toString(16).toUpperCase().padStart(8,"0");
+ $("#app").innerHTML=`
+ <div class="top noprint"><span class="brand">PAMAVA soluciones</span><div><button onclick="print()">🖨 Imprimir / guardar como PDF</button> <button class="gr" onclick="window.close()">Cerrar</button></div></div>
+ ${todo?"":`<div class="note w noprint">Esta constancia es una <b>vista previa</b>: la ruta aún no está completa (${apr} de ${ESTACIONES.length} estaciones aprobadas).</div>`}
+ <div class="cert"><div class="mk">PAMAVA soluciones</div>
+  <div class="brand">PAMAVA soluciones</div>
+  <h1>Constancia de práctica contable</h1>
+  <div class="mu">Se hace constar que</div>
+  <div class="nm">${esc(d.alumno||"__________________")}</div>
+  <p>completó la ruta de <b>Empresa Virtual PAMAVA</b> como auxiliar contable de <b>${esc(emp.nombre)}</b>, aprobando las ${ESTACIONES.length} estaciones de práctica:</p>
+  <table><thead><tr><th>Estación</th><th style="text-align:right">Nota</th></tr></thead><tbody>
+   ${ESTACIONES.map((s,i)=>`<tr><td>${s.ic} ${s.n}. ${esc(s.t)}</td><td style="text-align:right"><b>${notas[i].estado==="aprobada"?Number(notas[i].nota).toFixed(1):"—"}</b></td></tr>`).join("")}
+   <tr><td><b>Promedio general</b></td><td style="text-align:right"><b>${prom==null?"—":prom.toFixed(1)}</b> / 5.0</td></tr></tbody></table>
+  <p class="sm mu">Expedida el ${fch} · Código de verificación: <b>${cod}</b><br>Ejercicio académico con empresas y cifras ficticias.</p>
+  <div class="fm"><div>Docente</div><div>Estudiante</div></div>
+ </div>`;
+})();
+</script>
+</body>
+</html>

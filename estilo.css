@@ -69,3 +69,14 @@ td input{width:100%;min-width:130px}
 .q label:hover{background:#f2f6fb}
 .q.okq{border-color:#86efac;background:#f6fdf8}.q.badq{border-color:#fca5a5;background:#fff7f7}
 .big{font-size:44px;font-weight:800;color:var(--p)}
+/* ---- estaciones 7 a 9, práctica y constancia ---- */
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.g3 label{font-size:12px;color:#5b6b7f;display:block;margin-bottom:2px}.g3 input,.g3 select{width:100%;text-align:right}
+@media(max-width:640px){.g3{grid-template-columns:1fr}}
+.big{font-size:44px;font-weight:800;color:var(--p);line-height:1.1}
+.mv td,.mv th{padding:5px 6px;font-size:13px}
+.tbl2{width:100%}.tbl2 td{padding:5px 8px}
+.tema{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tema button{text-align:left;padding:12px;background:#fff;color:var(--tx);border:1.5px solid var(--bd);font-weight:600}
+.tema button:hover{border-color:var(--p);filter:none}
+.tema button small{display:block;color:var(--mu);font-weight:400;margin-top:2px}
+.streak{display:inline-block;background:var(--okb);color:var(--ok);border-radius:99px;padding:2px 12px;font-weight:700;font-size:13px}

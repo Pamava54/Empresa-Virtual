@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 8 · Nómina y seguridad social · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script src="fisc.js"></script>
+<script src="estx.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 8 · NÓMINA Y SEGURIDAD SOCIAL
+   Liquidación de 3 empleados, aportes del empleador y prestaciones, y sus asientos → evaluación A/B.
+   ===================================================================== */
+let NM=null;
+const TOL=3;
+
+function vGuia(){
+ return`<div class="card"><h3>¿Cómo se liquida una nómina?</h3>
+ <p>La nómina es lo que la empresa le paga a sus trabajadores, pero además del sueldo hay <b>descuentos</b>, <b>aportes</b> y <b>prestaciones</b> que se calculan cada mes. Esta estación es un ejercicio aparte de la nómina simplificada del hecho 10 de octubre: aquí liquidas el mes completo de los 3 empleados de tu empresa.</p>
+ <div class="sc"><table><thead><tr><th>Concepto</th><th>Cómo se calcula</th></tr></thead><tbody>
+ <tr><td><b>Salario mínimo 2026</b></td><td>${fmt(FISC.smmlv)} al mes</td></tr>
+ <tr><td><b>Auxilio de transporte 2026</b></td><td>${fmt(FISC.aux)}, solo para quien gana <b>hasta 2 salarios mínimos</b> (${fmt(2*FISC.smmlv)})</td></tr>
+ <tr><td><b>Total devengado</b></td><td>Sueldo + auxilio de transporte</td></tr>
+ <tr><td><b>Descuentos al trabajador</b></td><td>Salud 4 % y pensión 4 %, calculados sobre el <b>sueldo</b> (sin auxilio)</td></tr>
+ <tr><td><b>Neto a pagar</b></td><td>Total devengado − salud − pensión</td></tr>
+ <tr><td><b>Aportes del empleador</b></td><td>Pensión 12 %, ARL (riesgo I) 0,522 % y caja de compensación 4 %, sobre los sueldos. Salud (8,5 %), SENA e ICBF: la empresa está <b>exonerada</b> por ser sociedad y pagar menos de 10 salarios mínimos por trabajador.</td></tr>
+ <tr><td><b>Prestaciones sociales</b></td><td>Cesantías 8,33 % y prima 8,33 % (sobre sueldo + auxilio); intereses sobre cesantías 1 % mensual del valor de las cesantías; vacaciones 4,17 % (sobre el sueldo)</td></tr></tbody></table></div>
+ <p class="sm mu">Los empleados de este ejercicio ganan menos de 4 salarios mínimos y no llegan a la base de retención en la fuente por salarios. Valores legales de 2026; confírmalos siempre con la norma vigente. Redondea al peso; en los totales se acepta una diferencia de hasta $${TOL} por redondeo.</p></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li><b>Liquidación</b>: calcula el auxilio, el devengado, los descuentos y el neto de cada empleado.</li>
+ <li><b>Aportes y prestaciones</b>: calcula lo que le cuesta a la empresa además del sueldo.</li>
+ <li><b>Asientos</b>: contabiliza la nómina, su pago, los aportes, la planilla PILA y las prestaciones.</li>
+ <li>Con todo en verde se abre la <b>Evaluación</b>. Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 9.</li></ol>
+ <div class="c"><button data-t2="liq">Empezar con la liquidación →</button></div></div>`;
+}
+
+const DEFS={
+ liq:{tipo:"form",
+  intro:"Liquida el mes de octubre (30 días trabajados) de cada empleado. <b>Si no recibe auxilio de transporte escribe 0.</b>",
+  pista:"Auxilio: solo si el sueldo es de hasta 2 salarios mínimos. Salud y pensión: 4 % del sueldo cada una. Neto = sueldo + auxilio − salud − pensión.",
+  okMsg:()=>"¡Correcto! Total devengado "+fmt(NM.DEV)+" y neto a pagar "+fmt(NM.neto)+".",
+  groups:()=>NM.empl.map((e,i)=>({titulo:"Empleado "+(i+1)+" · "+e.nombre,chip:e.cargo,info:"Sueldo mensual: <b>"+fmt(e.sal)+"</b>",
+   fields:[{k:"a"+i,lab:"Auxilio de transporte",exp:()=>e.aux},{k:"d"+i,lab:"Total devengado",exp:()=>e.dev},{k:"s"+i,lab:"Salud 4 % (trabajador)",exp:()=>e.salud},
+    {k:"p"+i,lab:"Pensión 4 % (trabajador)",exp:()=>e.pen},{k:"n"+i,lab:"Neto a pagar",exp:()=>e.neto}]})).concat([{titulo:"Totales de la nómina",
+   fields:[{k:"TD",lab:"Total devengado",exp:()=>NM.DEV},{k:"TS",lab:"Total salud + pensión descontados",exp:()=>NM.salud+NM.pen},{k:"TN",lab:"Total neto a pagar",exp:()=>NM.neto}]}])},
+ apo:{tipo:"form",
+  intro:"Con los totales de la liquidación, calcula lo que la empresa debe pagar además del sueldo.",
+  pista:"Aportes: pensión 12 %, ARL 0,522 % y caja 4 %, sobre el total de sueldos. Cesantías y prima: 8,33 % de sueldos + auxilio. Intereses: 1 % de las cesantías. Vacaciones: 4,17 % de los sueldos.",
+  okMsg:()=>"¡Correcto! Aportes del empleador "+fmt(NM.penE+NM.arl+NM.caja)+" y prestaciones del mes "+fmt(NM.ces+NM.intc+NM.prima+NM.vac)+".",
+  groups:()=>[{titulo:"Aportes del empleador",info:"Total de sueldos: <b>"+fmt(NM.S)+"</b> (base de los aportes, sin auxilio)",
+   fields:[{k:"pe",lab:"Pensión 12 %",exp:()=>NM.penE,tol:TOL},{k:"arl",lab:"ARL 0,522 %",exp:()=>NM.arl,tol:TOL},{k:"cj",lab:"Caja de compensación 4 %",exp:()=>NM.caja,tol:TOL}]},
+   {titulo:"Prestaciones sociales del mes",info:"Sueldos + auxilio: <b>"+fmt(NM.DEV)+"</b> · Solo sueldos: <b>"+fmt(NM.S)+"</b>",
+   fields:[{k:"ce",lab:"Cesantías 8,33 %",exp:()=>NM.ces,tol:TOL},{k:"ic",lab:"Intereses sobre cesantías (1 %)",exp:()=>NM.intc,tol:TOL},{k:"pr",lab:"Prima de servicios 8,33 %",exp:()=>NM.prima,tol:TOL},{k:"va",lab:"Vacaciones 4,17 %",exp:()=>NM.vac,tol:TOL}]}]},
+ as:{tipo:"as",tol:TOL,
+  intro:"Contabiliza la nómina de octubre. Usa los totales de tus tareas anteriores (se acepta una diferencia de hasta $"+TOL+" por redondeo en cada valor).",
+  items:()=>NM.asientos.map(a=>({id:a.id,t:a.t,desc:a.desc,asiento:a.asiento,pista:a.pista}))}
+};
+
+function construir(v,seed){
+ const Q=[],e=NM.empl,aux2=2*FISC.smmlv;
+ if(v==="A"){
+  Q.push({t:"¿Quiénes tienen derecho al auxilio de transporte en 2026?",o:[{t:"Los trabajadores que ganan hasta 2 salarios mínimos",ok:true},{t:"Todos los trabajadores sin importar su sueldo",ok:false},{t:"Solo los que ganan más de 2 salarios mínimos",ok:false},{t:"Solo los gerentes",ok:false}],e:"El auxilio se paga a quien devenga hasta 2 SMMLV ("+fmt(aux2)+")."});
+  Q.push({t:"¿Cuál es el neto a pagar a "+e[1].nombre+" (sueldo "+fmt(e[1].sal)+")?",o:numOpts(e[1].neto,[e[1].dev,e[1].sal-e[1].ded,e[1].neto+e[1].salud]),e:"Sueldo "+fmt(e[1].sal)+" + auxilio "+fmt(e[1].aux)+" − salud "+fmt(e[1].salud)+" − pensión "+fmt(e[1].pen)+" = "+fmt(e[1].neto)+"."});
+  Q.push({t:"Verdadero o falso: el auxilio de transporte hace parte de la base para calcular los descuentos de salud y pensión del trabajador.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: salud y pensión se calculan solo sobre el sueldo, sin el auxilio de transporte."});
+  Q.push({t:"Sobre los sueldos totales de "+fmt(NM.S)+", ¿cuánto aporta la empresa a pensión (12 %)?",o:numOpts(NM.penE,[NM.pen,Math.round(NM.S*0.085),NM.caja]),e:"12 % × "+fmt(NM.S)+" = "+fmt(NM.penE)+"."});
+  Q.push({t:"¿Cuánto es el total devengado de la nómina de octubre (sueldos + auxilio)?",o:numOpts(NM.DEV,[NM.S,NM.neto,NM.DEV+NM.penE]),e:"Sueldos "+fmt(NM.S)+" + auxilio "+fmt(NM.A)+" = "+fmt(NM.DEV)+"."});
+ }else{
+  Q.push({t:"¿Cuál es el neto que se le paga a "+e[0].nombre+" (sueldo mínimo "+fmt(e[0].sal)+")?",o:numOpts(e[0].neto,[e[0].dev,e[0].sal,e[0].neto-e[0].aux]),e:"Sueldo + auxilio "+fmt(e[0].dev)+" − descuentos "+fmt(e[0].ded)+" = "+fmt(e[0].neto)+"."});
+  Q.push({t:"Verdadero o falso: "+e[2].nombre+", con sueldo de "+fmt(e[2].sal)+", recibe auxilio de transporte.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: gana más de 2 salarios mínimos ("+fmt(aux2)+"), por eso no recibe auxilio."});
+  Q.push({t:"¿Cuánto debes provisionar este mes por cesantías (8,33 % de sueldos + auxilio)?",o:numOpts(NM.ces,[NM.prima+1000,Math.round(NM.S*0.0833),NM.vac]),e:"8,33 % × "+fmt(NM.DEV)+" = "+fmt(NM.ces)+"."});
+  Q.push({t:"¿Cuánto se paga en total en la planilla PILA (salud, pensión 4 % + 12 %, ARL y caja)?",o:numOpts(NM.pila,[NM.penE+NM.arl+NM.caja,NM.salud+NM.pen,NM.pila+NM.neto]),e:"Salud "+fmt(NM.salud)+" + pensión "+fmt(NM.pen+NM.penE)+" + ARL "+fmt(NM.arl)+" + caja "+fmt(NM.caja)+" = "+fmt(NM.pila)+"."});
+  Q.push({t:"Al causar la nómina, ¿en qué cuenta se acredita lo que queda debiéndose a los trabajadores después de los descuentos?",o:[{t:"Salarios por pagar",ok:true},{t:"Sueldos (gasto)",ok:false},{t:"Cesantías consolidadas",ok:false},{t:"Bancos",ok:false}],e:"El neto que se debe a los trabajadores va al Haber en Salarios por pagar; se cancela cuando se les paga."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+
+estInit({ne:8,key:"e8",ic:"👥",titulo:"Nómina y seguridad social",sub:()=>"octubre de 2026 · 3 empleados",
+ tareas:[{id:"liq",t:"Liquidación",ic:"🧮"},{id:"apo",t:"Aportes y prestaciones",ic:"🏛"},{id:"as",t:"Asientos de nómina",ic:"🧾"}],
+ defs:DEFS,guia:vGuia,construir,sigTxt:"Se abrió la estación 9 · Ajustes y cierre del período."},async()=>{NM=nomina(EMP.n);});
+</script>
+</body>
+</html>

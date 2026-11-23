@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 7 · IVA y retenciones · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script src="fisc.js"></script>
+<script src="estx.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 7 · IVA Y RETENCIONES
+   Retención en la fuente y ReteICA sobre las compras y el arriendo de octubre,
+   su asiento contable y el resumen de IVA del mes → evaluación A/B.
+   ===================================================================== */
+let IR=null,M=null;
+const SI_NO=[["","—"],["s","Sí se retiene"],["n","No se retiene"]];
+
+function vGuia(){
+ return`<div class="card"><h3>¿Qué son las retenciones?</h3>
+ <p>Cuando tu empresa le compra o le paga un servicio a otro, la ley le pide que <b>retenga</b> un porcentaje y lo entregue a la DIAN (o al municipio), como un anticipo de los impuestos de quien vendió. Por eso al proveedor no se le paga todo: se le paga el total <b>menos las retenciones</b>, y lo retenido queda como una deuda de tu empresa con el Estado.</p>
+ <div class="sc"><table><thead><tr><th>Concepto</th><th>Base mínima</th><th>Tarifa</th><th>Cuenta (Haber)</th></tr></thead><tbody>
+ <tr><td><b>Retención en la fuente por compras</b></td><td>10 UVT = ${fmt(FISC.minBase)}</td><td>2,5 %</td><td>236540</td></tr>
+ <tr><td><b>Retención en la fuente por arriendo de inmuebles</b></td><td>10 UVT = ${fmt(FISC.minBase)}</td><td>3,5 %</td><td>236530</td></tr>
+ <tr><td><b>ReteICA</b> (impuesto municipal de industria y comercio)</td><td>Se aplica cuando hay retención</td><td>0,7 % <span class="sm mu">(didáctica)</span></td><td>236801</td></tr></tbody></table></div>
+ <p class="sm mu">UVT 2026 = ${fmt(FISC.uvt)}. La retención se calcula sobre la <b>base sin IVA</b> y solo si esa base llega a la base mínima. Si no llega, no se retiene nada. La tarifa de ReteICA es un ejemplo: en la vida real depende del acuerdo del municipio y de la actividad. Las bases y tarifas pueden cambiar por decreto: confírmalas siempre con la norma vigente.</p></div>
+ <div class="card"><h3>El IVA del mes</h3>
+ <p>Cada mes se comparan dos cuentas: el <b>IVA generado</b> (el que cobraste en tus ventas, Haber) y el <b>IVA descontable</b> (el que pagaste en tus compras, Debe).</p>
+ <ul><li>Si generado &gt; descontable → <b>IVA a pagar</b> a la DIAN.</li><li>Si descontable &gt; generado → <b>saldo a favor</b>, que se descuenta en el período siguiente.</li></ul></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li><b>Retenciones</b>: para cada compra y para el arriendo de octubre decide si se retiene y calcula retención, ReteICA y el valor neto que se paga o se debe.</li>
+ <li><b>Asientos</b>: contabiliza 3 de esas operaciones con las retenciones en el Haber.</li>
+ <li><b>IVA y retenciones del mes</b>: arma el resumen que se declara.</li>
+ <li>Con todo en verde se abre la <b>Evaluación</b>. Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 8.</li></ol>
+ <p class="sm mu">Redondea cada valor al peso. Si fallas dos veces en una tarea puedes ver la solución y luego corriges lo tuyo.</p>
+ <div class="c"><button data-t2="ret">Empezar con las retenciones →</button></div></div>`;
+}
+
+const DEFS={
+ ret:{tipo:"form",
+  intro:"Para cada operación de octubre calcula la retención. Recuerda: la base es el valor <b>sin IVA</b> y la base mínima es <b>"+"$523.740</b> (10 UVT). Si no llega, la retención y la ReteICA son $0.",
+  pista:"Compras: base × 2,5 %. Arriendo: valor × 3,5 %. ReteICA: base × 0,7 %. Neto = total de la factura (con IVA) − retención − ReteICA.",
+  okMsg:()=>"¡Correcto! Retenciones de octubre: "+fmt(IR.rfTot)+" en la fuente y "+fmt(IR.icaTot)+" de ReteICA.",
+  groups:()=>IR.ops.map(o=>({titulo:o.t,chip:o.tercero,doc:o.doc,
+   info:"Base (sin IVA): <b>"+fmt(o.base)+"</b>"+(o.iva?" · IVA: <b>"+fmt(o.iva)+"</b>":" · sin IVA")+" · Total de la operación: <b>"+fmt(o.tot)+"</b>",
+   fields:[{k:o.k+"_ap",lab:"¿Se practica retención?",sel:SI_NO,exp:()=>o.ap?"s":"n"},
+    {k:o.k+"_rf",lab:o.tipo==="arriendo"?"Retención por arrendamiento":"Retención en la fuente (compras)",exp:()=>o.rf},
+    {k:o.k+"_ica",lab:"ReteICA",exp:()=>o.ica},
+    {k:o.k+"_neto",lab:"Neto a pagar o a deber al tercero",exp:()=>o.neto}]}))},
+ as:{tipo:"as",
+  intro:"Contabiliza estas 3 operaciones <b>con sus retenciones</b>. La compra o el arriendo va al Debe; las retenciones, al Haber; y al tercero (o al banco) va el neto.",
+  items:()=>IR.pedir.map((o,i)=>({id:o.k,t:o.t,doc:o.doc,asiento:o.asiento,pista:o.pista,
+   datos:"Cuentas útiles: "+(o.tipo==="arriendo"?"512010 Arrendamientos · 236530 Retención arrendamientos":"143505 Mercancías / 152805 Equipos · 240802 IVA descontable · 236540 Retención compras")+" · 236801 ReteICA · "+(o.pago==="111005"?"111005 Bancos":"220505 Proveedores")+(o.ap?"":" · <b>Esta operación no llega a la base mínima.</b>")}))},
+ iva:{tipo:"form",
+  intro:"Arma el resumen de octubre. Usa los saldos de tu libro mayor: <b>IVA generado</b> (240801) e <b>IVA descontable</b> (240802, incluye el IVA del computador). Las retenciones son las de las tareas anteriores.",
+  pista:"Saldo = IVA generado − IVA descontable. Si da negativo es saldo a favor. Retención total = suma de las retenciones en la fuente (compras + arriendo); ReteICA = suma de las ReteICA.",
+  okMsg:()=>"¡Correcto! Resultado de IVA: "+(IR.saldo>=0?"a pagar ":"a favor ")+fmt(Math.abs(IR.saldo))+".",
+  groups:()=>[{titulo:"Resumen del mes · "+EMP.nombre,fields:[
+   {k:"g",lab:"IVA generado en ventas",exp:()=>IR.ivaGen},
+   {k:"d",lab:"IVA descontable en compras",exp:()=>IR.ivaDesc},
+   {k:"t",lab:"Resultado del IVA",sel:[["","—"],["p","Saldo a pagar"],["f","Saldo a favor"]],exp:()=>IR.saldo>=0?"p":"f"},
+   {k:"v",lab:"Valor del saldo (sin signo)",exp:()=>Math.abs(IR.saldo)},
+   {k:"rf",lab:"Retención en la fuente por pagar (compras + arriendo)",exp:()=>IR.rfTot},
+   {k:"ica",lab:"ReteICA por pagar",exp:()=>IR.icaTot}]}]}
+};
+
+function construir(v,seed){
+ const Q=[],ops=IR.ops,eq=ops.find(o=>o.k==="equipo"),arr=ops.find(o=>o.k==="arriendo"),merc=ops.filter(o=>o.tipo==="compra"&&o.k!=="equipo");
+ const m1=merc.find(o=>o.ap)||merc[0];
+ const sg=IR.saldo>=0?"a pagar":"a favor",v0=Math.abs(IR.saldo);
+ if(v==="A"){
+  Q.push({t:"En 2026 la UVT vale "+fmt(FISC.uvt)+". ¿Cuál es la base mínima en pesos para practicar retención en compras generales (10 UVT)?",o:numOpts(FISC.minBase,[27*FISC.uvt,4*FISC.uvt,2*FISC.uvt]),e:"10 UVT × "+fmt(FISC.uvt)+" = "+fmt(FISC.minBase)+"."});
+  Q.push({t:"Verdadero o falso: la retención en la fuente se calcula sobre el valor de la compra incluido el IVA.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: la base de la retención es el valor sin IVA."});
+  Q.push({t:"En la compra del computador (base "+fmt(eq.base)+"), ¿cuánto se retiene en la fuente al 2,5 %?",o:numOpts(eq.rf,[Math.round(eq.base*0.035),Math.round(eq.tot*0.025),Math.round(eq.base*0.19)]),e:"Base "+fmt(eq.base)+" × 2,5 % = "+fmt(eq.rf)+"."});
+  Q.push({t:"En esa misma compra (total "+fmt(eq.tot)+" con IVA), ¿cuánto queda debiendo la empresa al proveedor después de las retenciones?",o:numOpts(eq.neto,[eq.tot,eq.tot-eq.rf,eq.tot-eq.ica]),e:"Total "+fmt(eq.tot)+" − retención "+fmt(eq.rf)+" − ReteICA "+fmt(eq.ica)+" = "+fmt(eq.neto)+"."});
+  const fx=[{t:"Saldo "+sg+" de "+fmt(v0),ok:true},{t:"Saldo "+(sg==="a pagar"?"a favor":"a pagar")+" de "+fmt(v0),ok:false},{t:"Saldo "+sg+" de "+fmt(IR.ivaGen),ok:false},{t:"Saldo "+sg+" de "+fmt(IR.ivaDesc),ok:false}];
+  Q.push({t:"Tu IVA generado de octubre fue "+fmt(IR.ivaGen)+" y el descontable "+fmt(IR.ivaDesc)+". ¿Cuál es el resultado?",o:fx,e:"Generado − descontable = "+fmt(IR.saldo)+": "+(IR.saldo>=0?"hay IVA a pagar.":"el descontable es mayor, hay saldo a favor.")});
+ }else{
+  Q.push({t:"¿Cuál es la tarifa de retención en la fuente por compras generales cuando el vendedor es declarante de renta?",o:[{t:"2,5 %",ok:true},{t:"3,5 %",ok:false},{t:"4 %",ok:false},{t:"11 %",ok:false}],e:"Compras generales a declarantes: 2,5 % (siempre que la base llegue a 10 UVT)."});
+  Q.push({t:"Verdadero o falso: la ReteICA es un impuesto municipal, no se paga a la DIAN.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: el impuesto de industria y comercio lo administra el municipio."});
+  Q.push({t:"En la compra de mercancía de "+m1.tercero+" (base "+fmt(m1.base)+"), ¿cuánto es la ReteICA al 0,7 %?",o:m1.ap?numOpts(m1.ica,[Math.round(m1.base*0.025),Math.round(m1.base*0.07),Math.round(m1.tot*0.007)]):[{t:"$0, porque la base no llega a 10 UVT",ok:true},{t:fmt(Math.round(m1.base*0.007)),ok:false},{t:fmt(Math.round(m1.base*0.025)),ok:false},{t:fmt(Math.round(m1.tot*0.007)),ok:false}],e:m1.ap?"Base "+fmt(m1.base)+" × 0,7 % = "+fmt(m1.ica)+".":"Como la base es menor a "+fmt(FISC.minBase)+", no se retiene."});
+  const ao=arr.ap?[{t:"Sí: 3,5 % = "+fmt(arr.rf),ok:true},{t:"No: el arriendo nunca tiene retención",ok:false},{t:"Sí: 2,5 % = "+fmt(Math.round(arr.base*0.025)),ok:false},{t:"Sí: 11 % = "+fmt(Math.round(arr.base*0.11)),ok:false}]:
+   [{t:"No: está por debajo de la base mínima de "+fmt(FISC.minBase),ok:true},{t:"Sí: 3,5 % = "+fmt(Math.round(arr.base*0.035)),ok:false},{t:"Sí: 2,5 % = "+fmt(Math.round(arr.base*0.025)),ok:false},{t:"Sí: 4 % = "+fmt(Math.round(arr.base*0.04)),ok:false}];
+  Q.push({t:"Pagaste de arriendo "+fmt(arr.base)+". ¿Se practica retención?",o:ao,e:arr.ap?"El arriendo de inmuebles retiene 3,5 % cuando llega a la base mínima: "+fmt(arr.rf)+".":"Como "+fmt(arr.base)+" es menor a "+fmt(FISC.minBase)+", no se practica retención."});
+  Q.push({t:"¿Cuánto debes pagar a la DIAN por retención en la fuente de tus compras y arriendo de octubre?",o:numOpts(IR.rfTot,[IR.rfCompras,IR.rfTot+IR.icaTot,IR.icaTot]),e:"Compras "+fmt(IR.rfCompras)+" + arriendo "+fmt(IR.rfArr)+" = "+fmt(IR.rfTot)+"."});
+ }
+ return Q.slice(0,5).map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+
+estInit({ne:7,key:"e7",ic:"💸",titulo:"IVA y retenciones",sub:()=>"octubre de 2026 · UVT "+fmt(FISC.uvt),
+ tareas:[{id:"ret",t:"Retenciones",ic:"🧮"},{id:"as",t:"Asientos con retenciones",ic:"🧾"},{id:"iva",t:"IVA y retenciones del mes",ic:"📋"}],
+ defs:DEFS,guia:vGuia,construir,sigTxt:"Se abrió la estación 8 · Nómina y seguridad social."},async()=>{M=generarMes(EMP.n);IR=ivaRet(EMP.n);});
+</script>
+</body>
+</html>

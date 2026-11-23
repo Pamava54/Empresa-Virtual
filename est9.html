@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 9 · Ajustes y cierre del período · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script src="fisc.js"></script>
+<script src="estx.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 9 · AJUSTES Y CIERRE DEL PERÍODO
+   Depreciación, causación, provisión de cartera e impuesto de renta; estados ajustados;
+   asientos de cierre → evaluación A/B y fin de la ruta.
+   ===================================================================== */
+let CI=null,ES=null;
+
+function vGuia(){
+ return`<div class="card"><h3>¿Por qué hay que ajustar y cerrar?</h3>
+ <p>Al terminar el mes, la contabilidad todavía no refleja todo: hay gastos que ya ocurrieron pero no se han pagado, activos que se desgastaron y riesgos que conviene reconocer. Los <b>ajustes</b> corrigen eso. Después se <b>cierran</b> las cuentas de ingresos y gastos para saber cuánto ganó la empresa y trasladarlo al patrimonio.</p>
+ <div class="sc"><table><thead><tr><th>Ajuste</th><th>Idea</th><th>Asiento</th></tr></thead><tbody>
+ <tr><td><b>Depreciación</b></td><td>Los equipos pierden valor con el uso. Costo ÷ meses de vida útil.</td><td>Debe: gasto de depreciación · Haber: depreciación acumulada</td></tr>
+ <tr><td><b>Causación</b></td><td>El gasto es del mes en que ocurre, aunque se pague después.</td><td>Debe: gasto · Haber: cuenta por pagar</td></tr>
+ <tr><td><b>Provisión de cartera</b></td><td>Parte de lo que deben los clientes puede no cobrarse.</td><td>Debe: gasto de provisión · Haber: provisión de deudores</td></tr>
+ <tr><td><b>Impuesto de renta</b></td><td>Se reconoce sobre la utilidad antes de impuestos (tarifa ${FISC.renta*100} %).</td><td>Debe: gasto de impuesto · Haber: impuesto por pagar</td></tr></tbody></table></div>
+ <p class="sm mu">El <b>cierre</b> traslada los saldos de ingresos y gastos a la cuenta <b>Ganancias y pérdidas</b> y de ahí a <b>Utilidad del ejercicio</b>. Partes de los estados financieros de octubre que armaste en la estación 5.</p></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li><b>Ajustes</b>: registra los 4 asientos de ajuste de octubre.</li>
+ <li><b>Estados ajustados</b>: recalcula utilidad, impuesto y el balance con los ajustes.</li>
+ <li><b>Cierre</b>: cierra ingresos, costos y gastos y traslada la utilidad.</li>
+ <li>Con todo en verde se abre la <b>Evaluación</b> final de la ruta. Con <b>${CFG.notaMinima.toFixed(1)} o más</b> terminas las 9 estaciones.</li></ol>
+ <div class="c"><button data-t2="aj">Empezar con los ajustes →</button></div></div>`;
+}
+
+const DEFS={
+ aj:{tipo:"as",
+  intro:"Estos son los ajustes de fin de octubre de tu empresa. Registra cada uno.",
+  items:()=>CI.ajustes.map(a=>({id:a.id,t:a.t,desc:a.desc,asiento:a.asiento,pista:a.pista}))},
+ est:{tipo:"form",
+  intro:"Con los ajustes, recalcula el resultado del mes y el balance.",
+  pista:"Utilidad antes de impuestos = utilidad neta de la estación 5 − depreciación − acueducto − provisión. Impuesto = esa utilidad × 35 %. Activos ajustados = activos de la estación 5 − depreciación − provisión. Pasivos ajustados = pasivos + acueducto + impuesto por pagar.",
+  okMsg:()=>"¡Correcto! Utilidad neta ajustada de "+fmt(CI.un)+" y balance cuadrado: activos "+fmt(CI.activos)+" = pasivos "+fmt(CI.pasivos)+" + patrimonio "+fmt(CI.patrimonio)+".",
+  groups:()=>[{titulo:"Estado de resultados ajustado",info:"Utilidad neta de octubre que calculaste en la estación 5 (antes de ajustes): <b>"+fmt(CI.unAntes)+"</b>",
+   fields:[{k:"uai",lab:"Utilidad antes de impuestos (con ajustes)",exp:()=>CI.uai},{k:"imp",lab:"Impuesto de renta (35 %)",exp:()=>CI.renta},{k:"un",lab:"Utilidad neta del período",exp:()=>CI.un}]},
+   {titulo:"Situación financiera ajustada",info:"Total activos de la estación 5: <b>"+fmt(ES.esf.act)+"</b> · Total pasivos: <b>"+fmt(ES.esf.pas)+"</b> · Capital: <b>"+fmt(ES.esf.cap)+"</b>",
+   fields:[{k:"act",lab:"Total activos ajustados",exp:()=>CI.activos},{k:"pas",lab:"Total pasivos ajustados",exp:()=>CI.pasivos},{k:"pat",lab:"Patrimonio (capital + utilidad)",exp:()=>CI.patrimonio}]}]},
+ ci:{tipo:"as",
+  intro:"Cierra las cuentas de resultados de octubre. Cuentas útiles: 590505 Ganancias y pérdidas, 360505 Utilidad del ejercicio.",
+  items:()=>CI.cierres.map(a=>({id:a.id,t:a.t,desc:a.desc,asiento:a.asiento,pista:a.pista,
+   datos:a.id==="cg"?"Costos y gastos del mes (incluye los ajustes y el impuesto): <b>"+CI.gast.map(x=>x[0]+" "+PUCT[x[0]]+" "+fmt(x[1])).join(" · ")+"</b>":(a.id==="ci"?"Ingresos de octubre: <b>"+fmt(CI.ing)+"</b> por ventas"+(CI.ifin?" y <b>"+fmt(CI.ifin)+"</b> por intereses":""):"Utilidad neta del período: <b>"+fmt(CI.un)+"</b>")}))}
+};
+
+function construir(v,seed){
+ const Q=[];
+ if(v==="A"){
+  Q.push({t:"El computador costó "+fmt(CI.eq)+" y se deprecia en "+CI.meses+" meses por línea recta. ¿Cuánto es la depreciación de octubre?",o:numOpts(CI.dep,[CI.eq,Math.round(CI.eq/12),CI.dep*2]),e:fmt(CI.eq)+" ÷ "+CI.meses+" = "+fmt(CI.dep)+"."});
+  Q.push({t:"Verdadero o falso: la depreciación acumulada se registra en el Haber y disminuye el valor del activo.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: es una cuenta de naturaleza crédito que resta al valor del equipo."});
+  Q.push({t:"El aviso del acueducto de octubre ("+fmt(CI.acu)+") llegó sin pagarse. ¿Cuál es el asiento de causación?",o:[{t:"Debe: Acueducto (gasto). Haber: Servicios públicos por pagar.",ok:true},{t:"Debe: Servicios públicos por pagar. Haber: Acueducto.",ok:false},{t:"Debe: Bancos. Haber: Acueducto.",ok:false},{t:"Debe: Acueducto. Haber: Bancos.",ok:false}],e:"El gasto es del mes aunque no se haya pagado: gasto al Debe y cuenta por pagar al Haber."});
+  Q.push({t:"Tu utilidad antes de impuestos con los ajustes es "+fmt(CI.uai)+". ¿Cuánto es el impuesto de renta al 35 %?",o:numOpts(CI.renta,[Math.round(CI.uai*0.19),CI.un,Math.round(CI.uai*0.5)]),e:fmt(CI.uai)+" × 35 % = "+fmt(CI.renta)+"."});
+  Q.push({t:"¿Cuál es la utilidad neta del período después de ajustes e impuesto?",o:numOpts(CI.un,[CI.uai,CI.unAntes,CI.un+CI.renta+CI.dep]),e:fmt(CI.uai)+" − impuesto "+fmt(CI.renta)+" = "+fmt(CI.un)+"."});
+ }else{
+  Q.push({t:"Provisionaste el 1 % de la cartera de clientes ("+fmt(CI.cli)+"). ¿Cuánto es la provisión?",o:numOpts(CI.prov,[CI.cli,Math.round(CI.cli*0.1),Math.round(CI.cli*0.19)]),e:fmt(CI.cli)+" × 1 % = "+fmt(CI.prov)+"."});
+  Q.push({t:"Verdadero o falso: al cerrar el período, las cuentas de ingresos, costos y gastos quedan en cero.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: se cancelan contra Ganancias y pérdidas y su resultado pasa al patrimonio."});
+  Q.push({t:"En el cierre de ingresos, ¿qué se hace con la cuenta de ingresos por ventas?",o:[{t:"Se debita para cancelarla y se acredita Ganancias y pérdidas",ok:true},{t:"Se acredita para cancelarla",ok:false},{t:"Se deja con su saldo para el próximo mes",ok:false},{t:"Se traslada a Clientes",ok:false}],e:"Los ingresos tienen saldo crédito: se debitan para llevarlos a cero y el total se acredita en Ganancias y pérdidas."});
+  Q.push({t:"¿Cuánto suman los costos y gastos que se cierran (incluidos depreciación, acueducto, provisión e impuesto)?",o:numOpts(CI.totG,[CI.ing,CI.totG-CI.renta,CI.un]),e:"Suma de las cuentas de costos y gastos del mes: "+fmt(CI.totG)+"."});
+  Q.push({t:"Con los ajustes, ¿cuánto suma el total de activos de tu empresa?",o:numOpts(CI.activos,[ES.esf.act,CI.pasivos,CI.patrimonio]),e:"Activos de la estación 5 "+fmt(ES.esf.act)+" − depreciación "+fmt(CI.dep)+" − provisión "+fmt(CI.prov)+" = "+fmt(CI.activos)+"."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+
+estInit({ne:9,key:"e9",ic:"🔒",titulo:"Ajustes y cierre del período",sub:()=>"octubre de 2026",
+ tareas:[{id:"aj",t:"Ajustes",ic:"🛠"},{id:"est",t:"Estados ajustados",ic:"📊"},{id:"ci",t:"Cierre",ic:"🔐"}],
+ defs:DEFS,guia:vGuia,construir,sigTxt:""},async()=>{CI=cierre(EMP.n);ES=estados(EMP.n);});
+</script>
+</body>
+</html>

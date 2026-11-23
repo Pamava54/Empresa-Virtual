@@ -41,10 +41,11 @@ const FLAVOR={
 };
 
 function nitDe(texto){const h=hashStr("nit"+texto);const x=String(800000000+(h%199999999));return x.slice(0,3)+"."+x.slice(3,6)+"."+x.slice(6,9)+"-"+(h%10);}
-function dia(d){return String(d).padStart(2,"0")+" oct. 2026";}
+const MESX={nom:"octubre",Nom:"Octubre",abr:"oct.",anio:2026,ronda:0,ant:"Septiembre"};
+function dia(d){return String(d).padStart(2,"0")+" "+MESX.abr+" "+MESX.anio;}
 
 function generarMes(n){
- const R=mulberry32(hashStr("mes#"+n));
+ const R=mulberry32(hashStr("mes#"+n+(MESX.ronda?"r"+MESX.ronda:"")));
  const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
  const F=FLAVOR[n],prod=F[0],PV=F[1],CL=F[2];
  const emp=EMPRESAS[n-1];
@@ -128,12 +129,12 @@ function generarMes(n){
   vals:{cli:CL[0],base:s1,iva:iva(s1),total:tot(s1)}});
 
  add({k:"arriendo",dia:8,t:"Pago del arriendo del local",
-  doc:D("COMPROBANTE DE EGRESO","CE-"+(ce++),8,[P("Pagado a","Inmobiliaria Centro Ibagué"),P("Concepto","Arriendo del local · octubre"),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(arr)]]),
+  doc:D("COMPROBANTE DE EGRESO","CE-"+(ce++),8,[P("Pagado a","Inmobiliaria Centro Ibagué"),P("Concepto","Arriendo del local · "+MESX.nom),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empresa",emp.nombre)],null,[["VALOR PAGADO",fmt(arr)]]),
   asiento:[{c:"512010",s:"D",v:arr},{c:"111005",s:"H",v:arr}],
   pista:"El arriendo es un gasto (Debe). Salió plata del banco (Haber)."});
 
  add({k:"energia",dia:9,t:"Pago del servicio de energía",
-  doc:D("FACTURA DE SERVICIO PÚBLICO","SP-"+ri(10000,99999),9,[P("Empresa de energía","Energía del Tolima S.A. E.S.P."),P("Cliente",emp.nombre),P("Periodo","Septiembre–octubre"),P("Medio de pago","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(ene)]]),
+  doc:D("FACTURA DE SERVICIO PÚBLICO","SP-"+ri(10000,99999),9,[P("Empresa de energía","Energía del Tolima S.A. E.S.P."),P("Cliente",emp.nombre),P("Periodo",MESX.ant+"–"+MESX.nom),P("Medio de pago","Pago PSE · "+emp.banco.n)],null,[["VALOR PAGADO",fmt(ene)]]),
   asiento:[{c:"513530",s:"D",v:ene},{c:"111005",s:"H",v:ene}],
   pista:"Los servicios públicos son un gasto (Debe). Se pagó desde el banco (Haber)."});
 
@@ -156,7 +157,7 @@ function generarMes(n){
   pista:"Un equipo que se usa por años es un activo (Equipos de procesamiento de datos). El IVA es descontable y se debe el total."});
 
  add({k:"nomina",dia:15,t:"Pago de la nómina",
-  doc:D("PLANILLA DE NÓMINA","NM-"+ri(100,999),15,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empleados","Personal de la empresa")],null,[["TOTAL SUELDOS PAGADOS",fmt(nom)]],"Para este ejercicio se registra solo el sueldo pagado (sin prestaciones ni aportes)."),
+  doc:D("PLANILLA DE NÓMINA","NM-"+ri(100,999),15,[P("Empresa",emp.nombre),P("Periodo",MESX.Nom+" "+MESX.anio),P("Medio de pago","Transferencia · "+emp.banco.n),P("Empleados","Personal de la empresa")],null,[["TOTAL SUELDOS PAGADOS",fmt(nom)]],"Para este ejercicio se registra solo el sueldo pagado (sin prestaciones ni aportes)."),
   asiento:[{c:"510506",s:"D",v:nom},{c:"111005",s:"H",v:nom}],
   pista:"Los sueldos son un gasto (Debe) y se pagaron desde el banco (Haber)."});
 
@@ -203,7 +204,7 @@ function generarMes(n){
   pista:"Entra efectivo a la caja (Debe) y la deuda del cliente baja (Clientes al Haber)."});
 
  add({k:"costo",dia:30,t:"Costo de las ventas del mes",
-  doc:D("REPORTE DE INVENTARIO PERMANENTE (KARDEX)","KD-OCT",30,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Producto","Mercancía: "+prod),P("Método","Promedio ponderado")],null,[["COSTO DE LA MERCANCÍA VENDIDA",fmt(costo)]],"Al vender, la mercancía sale del inventario y se reconoce su costo."),
+  doc:D("REPORTE DE INVENTARIO PERMANENTE (KARDEX)","KD-"+MESX.nom.slice(0,3).toUpperCase(),30,[P("Empresa",emp.nombre),P("Periodo",MESX.Nom+" "+MESX.anio),P("Producto","Mercancía: "+prod),P("Método","Promedio ponderado")],null,[["COSTO DE LA MERCANCÍA VENDIDA",fmt(costo)]],"Al vender, la mercancía sale del inventario y se reconoce su costo."),
   asiento:[{c:"613595",s:"D",v:costo},{c:"143505",s:"H",v:costo}],
   pista:"El costo de ventas es un gasto (Debe) y la mercancía vendida sale del inventario (Haber)."});
 
@@ -219,7 +220,7 @@ function conciliar(n){
  const M=generarMes(n),emp=M.emp,R=mulberry32(hashStr("conc"+n));
  const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
  const num=h=>{const m=(h.doc.partes.map(p=>p[1]).join(" ").match(/[Cc]heque No\. (\d+)/));return m?m[1]:"";};
- const dOct=d=>String(d).padStart(2,"0")+" oct. 2026";
+ const dOct=d=>String(d).padStart(2,"0")+" "+MESX.abr+" "+MESX.anio;
  /* movimientos del libro de bancos (en orden de fecha) */
  const L=[];let sal=0;
  M.hechos.forEach(h=>{const l=h.asiento.find(x=>x.c==="111005");if(!l)return;
