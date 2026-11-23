@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 3 · Conciliación bancaria · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.mv td,.mv th{padding:5px 8px;font-size:13px}
+.ok{border-color:#86efac!important;background:#f0fdf4!important}.bad{border-color:#fca5a5!important;background:#fff1f1!important}
+.cj{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.cj{grid-template-columns:1fr}}
+.cj .r{display:grid;grid-template-columns:1fr 150px;gap:8px;align-items:center;margin-top:8px}
+.cj .r input{width:100%;text-align:right}
+.cj .t{border-top:2px solid #cbd5e1;padding-top:8px;margin-top:10px}
+.cl select{width:100%}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 3 · CONCILIACIÓN BANCARIA
+   Libro de bancos (de los hechos) vs. extracto del banco → partidas conciliatorias →
+   conciliación → asientos de ajuste → evaluación A/B
+   ===================================================================== */
+let SES=null,EMP=null,D=null,M=null,C=null,T=null,TAB="guia",FB={},EV=null;
+const NE=3;
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ if(D.estaciones[NE].estado==="bloqueada"&&!esDoc()){location.href="index.html";return;}
+ M=generarMes(EMP.n);C=conciliar(EMP.n);
+ T=D.trabajo.e3=D.trabajo.e3||{};
+ T.cot=T.cot||{};T.cot.s=T.cot.s||{};T.con=T.con||{};T.aj=T.aj||{};
+ C.ajustes.forEach(a=>{const x=T.aj[a.k]=T.aj[a.k]||{};if(!x.a||!x.a.length)x.a=[{c:"",d:"",h:""},{c:"",d:"",h:""}];});
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+function listos(){return(T.cot.ok?1:0)+(T.con.ok?1:0)+C.ajustes.filter(a=>T.aj[a.k].ok).length;}
+function total(){return 2+C.ajustes.length;}
+function completo(){return listos()===total();}
+function verOk(o){return!o.ok&&!o.seen&&((o.tries||0)>=2||esDoc());}
+
+function render(){
+ const nl=listos(),tt=total();
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. Verás siempre el botón “Ver solución”.</div>`:""}
+ <div class="card"><h2>🏦 Estación 3 · Conciliación bancaria</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · ${esc(C.banco)} · cuenta ${esc(C.cuenta)} · octubre de 2026</div>
+  <div style="margin-top:8px" class="sm mu">Tareas completadas: ${nl} de ${tt}</div><div class="bar"><i style="width:${nl/tt*100}%"></i></div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes repasar todo lo que quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="cot"?"":"gr"}" data-t="cot">🔍 1. Comparar${T.cot.ok?" ✅":""}</button>
+  <button class="${TAB==="con"?"":"gr"}" data-t="con">🧮 2. Conciliación${T.con.ok?" ✅":""}</button>
+  <button class="${TAB==="aj"?"":"gr"}" data-t="aj">✍️ 3. Ajustes (${C.ajustes.filter(a=>T.aj[a.k].ok).length}/${C.ajustes.length})</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="cot"?vCot():TAB==="con"?vCon():TAB==="aj"?vAj():vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>¿Qué es una conciliación bancaria?</h3>
+ <p>Es comparar lo que tu empresa tiene anotado en su cuenta de <b>Bancos</b> (tus libros) con lo que dice el <b>extracto</b> que envía el banco. Casi nunca coinciden el día del corte, y la conciliación explica por qué.</p>
+ <div class="sc"><table><thead><tr><th>Partida</th><th>Qué es</th><th>Se ajusta en…</th><th>Efecto</th></tr></thead><tbody>
+ <tr><td><b>Cheque girado y no cobrado</b></td><td>Lo registraste tú, pero el beneficiario aún no lo cobra.</td><td>Extracto</td><td>Se <b>resta</b> al saldo del extracto</td></tr>
+ <tr><td><b>Consignación / abono en tránsito</b></td><td>Lo registraste tú, pero el banco aún no lo acredita.</td><td>Extracto</td><td>Se <b>suma</b> al saldo del extracto</td></tr>
+ <tr><td><b>Nota débito</b></td><td>El banco cobró algo (comisión, cuota de manejo) que tú no habías registrado.</td><td>Libros</td><td>Se <b>resta</b> al saldo de libros</td></tr>
+ <tr><td><b>Nota crédito</b></td><td>El banco abonó algo (intereses) que tú no habías registrado.</td><td>Libros</td><td>Se <b>suma</b> al saldo de libros</td></tr></tbody></table></div></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li><b>Comparar</b>: tienes tu libro de bancos (con los movimientos que ya viste en las estaciones anteriores) y el extracto del banco. Marca, línea por línea, qué aparece en el otro documento y qué no.</li>
+ <li><b>Conciliación</b>: parte del saldo del extracto y del saldo de libros, aplica las partidas y comprueba que los dos saldos conciliados sean iguales.</li>
+ <li><b>Ajustes</b>: las notas débito y crédito no estaban en tus libros; registra su asiento.</li>
+ <li>Con todo en verde se abre la <b>Evaluación</b> (5 preguntas sobre tu empresa). Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 4.</li></ol>
+ <p class="sm mu">Si fallas dos veces en una tarea puedes ver la solución, y luego corriges lo tuyo hasta que quede bien.</p>
+ <div class="c"><button data-t2="cot">Empezar a comparar →</button></div></div>`;
+}
+
+/* ---------------- 1. COMPARAR ---------------- */
+function docs(){
+ return`<div class="card"><h3>📒 Libro de bancos (cuenta 111005) · tus libros</h3>
+ <div class="sc"><table class="mv"><thead><tr><th>Fecha</th><th>Concepto</th><th style="text-align:right">Debe</th><th style="text-align:right">Haber</th><th style="text-align:right">Saldo</th></tr></thead><tbody>
+ ${C.libros.map(l=>`<tr><td>${esc(l.fecha)}</td><td>${esc(l.concepto)}</td><td class="n" style="text-align:right">${l.d?fmt(l.d):""}</td><td class="n" style="text-align:right">${l.h?fmt(l.h):""}</td><td class="n" style="text-align:right">${fmt(l.saldo)}</td></tr>`).join("")}
+ <tr style="background:#eef3fa"><td colspan="4"><b>SALDO SEGÚN LIBROS</b></td><td class="n" style="text-align:right"><b>${fmt(C.saldoLibros)}</b></td></tr></tbody></table></div></div>
+ <div class="card"><h3>🏦 Extracto bancario · ${esc(C.banco)} · cuenta ${esc(C.cuenta)}</h3>
+ <div class="sc"><table class="mv"><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Retiros</th><th style="text-align:right">Depósitos</th><th style="text-align:right">Saldo</th></tr></thead><tbody>
+ ${C.extracto.map(e=>`<tr><td>${esc(e.fecha)}</td><td>${esc(e.concepto)}</td><td class="n" style="text-align:right">${e.d?fmt(e.d):""}</td><td class="n" style="text-align:right">${e.c?fmt(e.c):""}</td><td class="n" style="text-align:right">${fmt(e.saldo)}</td></tr>`).join("")}
+ <tr style="background:#eef3fa"><td colspan="4"><b>SALDO SEGÚN EXTRACTO AL 31 DE OCTUBRE</b></td><td class="n" style="text-align:right"><b>${fmt(C.saldoExtracto)}</b></td></tr></tbody></table></div></div>`;
+}
+function vCot(){
+ const o=T.cot,fb=FB.cot,dis=o.ok?"disabled":"";
+ const ini=id=>(o.s&&o.s[id])||"";
+ const cl=id=>fb?(fb[id]?"ok":"bad"):"";
+ const rl=C.libros.map(l=>`<tr><td>${esc(l.fecha)}</td><td>${esc(l.concepto)}</td><td class="n" style="text-align:right">${fmt(l.d||l.h)}</td><td><select data-cot="${l.id}" class="${cl(l.id)}" ${dis}><option value="">—</option><option value="s" ${ini(l.id)==="s"?"selected":""}>Sí está en el extracto</option><option value="n" ${ini(l.id)==="n"?"selected":""}>No está en el extracto</option></select></td></tr>`).join("");
+ const re=C.extracto.map(e=>`<tr><td>${esc(e.fecha)}</td><td>${esc(e.concepto)}</td><td class="n" style="text-align:right">${fmt(e.d||e.c)}</td><td><select data-cot="${e.id}" class="${cl(e.id)}" ${dis}><option value="">—</option><option value="s" ${ini(e.id)==="s"?"selected":""}>Sí está en mis libros</option><option value="n" ${ini(e.id)==="n"?"selected":""}>No está en mis libros</option></select></td></tr>`).join("");
+ return`${docs()}
+ <div class="card"><h3>🔍 Compara los dos documentos</h3>
+ <p class="sm mu">Para cada movimiento de tus libros, indica si aparece en el extracto. Para cada línea del extracto, indica si ya estaba en tus libros.</p>
+ <b>Movimientos de tus libros</b><div class="sc cl"><table class="mv"><thead><tr><th>Fecha</th><th>Concepto</th><th style="text-align:right">Valor</th><th>¿Aparece?</th></tr></thead><tbody>${rl}</tbody></table></div>
+ <b style="display:block;margin-top:12px">Líneas del extracto</b><div class="sc cl"><table class="mv"><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Valor</th><th>¿Aparece?</th></tr></thead><tbody>${re}</tbody></table></div>
+ ${o.ok?`<div class="note sm" style="margin-top:10px">✅ Correcto. Las diferencias son: ${C.cheques.length} cheque girado y no cobrado, ${C.transito.length} abono en tránsito, 1 nota débito y 1 nota crédito.</div>`:`<div class="toolbar"><button data-chkcot="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seecot="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay líneas incorrectas (en rojo). <b>Pista:</b> busca cada movimiento por su valor y su fecha en el otro documento. Los cheques pueden aparecer cobrados unos días después de girados.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b> no aparecen en el extracto: ${C.cheques.map(c=>"el "+c.concepto+" ("+fmt(c.h)+")").join(", ")} y ${C.transito.map(c=>"“"+c.concepto+"” ("+fmt(c.d)+")").join(", ")}. No están en tus libros: la cuota de manejo (${fmt(C.nd)}) y los intereses (${fmt(C.nc)}). Todo lo demás está en los dos. Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- 2. CONCILIACIÓN ---------------- */
+const CF=[["e1","Saldo según extracto",()=>C.saldoExtracto],["e2","(+) Abonos y consignaciones en tránsito",()=>C.sumTransito],["e3","(−) Cheques girados y no cobrados",()=>C.sumCheques],["e4","(=) Saldo conciliado",()=>C.concil],
+          ["l1","Saldo según libros",()=>C.saldoLibros],["l2","(+) Notas crédito (intereses)",()=>C.nc],["l3","(−) Notas débito (cuota de manejo)",()=>C.nd],["l4","(=) Saldo conciliado",()=>C.conciliadoLibros]];
+function vCon(){
+ if(!T.cot.ok&&!esDoc())return`<div class="card"><h3>🔒 Primero compara los documentos</h3><p class="mu">Termina la tarea “1. Comparar” para abrir la conciliación.</p></div>`;
+ const o=T.con,fb=FB.con,dis=o.ok?"disabled":"";
+ const col=(t,ids)=>`<div><h4>${t}</h4>${ids.map(id=>{const f=CF.find(x=>x[0]===id);return`<div class="r ${id.endsWith("4")?"t":""}"><span>${f[1]}</span><input inputmode="numeric" data-con="${id}" value="${esc((o.v&&o.v[id])||"")}" class="${fb?(fb[id]?"ok":"bad"):""}" ${dis}></div>`;}).join("")}</div>`;
+ return`<div class="card"><h3>🧮 Conciliación bancaria al 31 de octubre de 2026</h3>
+ <p class="sm mu">Escribe los valores en positivo. Los dos saldos conciliados deben quedar iguales.</p>
+ <div class="cj">${col("Desde el extracto",["e1","e2","e3","e4"])}${col("Desde tus libros",["l1","l2","l3","l4"])}</div>
+ ${o.ok?`<div class="note sm" style="margin-top:12px">✅ ¡Conciliado! Los dos saldos dan <b>${fmt(C.concil)}</b>. Ese será el saldo real de Bancos una vez registres las notas del banco.</div>`:`<div class="toolbar"><button data-chkcon="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seecon="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> extracto + abonos en tránsito − cheques pendientes; libros + notas crédito − notas débito. Si hiciste bien las dos cuentas, el resultado es el mismo.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b><table style="margin-top:4px">${CF.map(f=>`<tr><td>${f[1]}</td><td class="n" style="text-align:right">${fmt(f[2]())}</td></tr>`).join("")}</table>Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- 3. AJUSTES ---------------- */
+function vAj(){
+ if(!T.con.ok&&!esDoc())return`<div class="card"><h3>🔒 Primero termina la conciliación</h3><p class="mu">Completa la tarea “2. Conciliación” para abrir los ajustes.</p></div>`;
+ const opts=sel=>`<option value="">— cuenta —</option>`+PUC_LIST.map(c=>`<option value="${c}" ${sel===c?"selected":""}>${c} · ${PUC[c]}</option>`).join("");
+ const cards=C.ajustes.map(a=>{
+  const x=T.aj[a.k],fb=FB["aj"+a.k],dis=x.ok?"disabled":"";
+  const lns=x.a.map((l,i)=>{const cl=fb&&fb.lineOk&&fb.lineOk[i]===true?"ok":(fb&&fb.lineOk&&fb.lineOk[i]===false?"bad":"");
+   return`<div class="ln"><select data-aj="${a.k}" data-i="${i}" data-f="c" class="${cl}" ${dis}>${opts(l.c)}</select><input inputmode="numeric" placeholder="Debe" data-aj="${a.k}" data-i="${i}" data-f="d" value="${esc(l.d)}" class="${cl}" ${dis}><input inputmode="numeric" placeholder="Haber" data-aj="${a.k}" data-i="${i}" data-f="h" value="${esc(l.h)}" class="${cl}" ${dis}></div>`;}).join("");
+  return`<div class="hc ${x.ok?"done":""}"><h3><span>${esc(a.t)}</span>${x.ok?`<span class="pill ok">✅ Correcto</span>`:x.seen?`<span class="pill w">👁 Visto</span>`:`<span class="pill">${esc(a.fecha)}</span>`}</h3>
+  <div class="doc" style="padding:10px"><b>${esc(C.banco)}</b> · ${a.k==="nd"?"NOTA DÉBITO":"NOTA CRÉDITO"} · ${esc(a.fecha)}<br>${esc(a.t.split(": ")[1])} · <b>${fmt(a.valor)}</b></div>
+  <div style="margin-top:10px"><b>Tu asiento:</b>${lns}
+  ${x.ok?"":`<div class="toolbar"><button class="sec s" data-addaj="${a.k}">+ línea</button><button data-chkaj="${a.k}">✔ Revisar</button>${verOk(x)?`<button class="gr" data-seeaj="${a.k}">👁 Ver asiento correcto</button>`:""}</div>`}
+  ${fb&&!x.ok?`<div class="note r sm">Tienes <b>${fb.found} de ${fb.total}</b> líneas correctas. <b>Pista:</b> ${esc(a.pista)}</div>`:""}
+  ${x.seen&&!x.ok?`<div class="note sm"><b>Asiento correcto:</b><table style="margin-top:4px">${a.asiento.map(l=>`<tr><td>${l.c} · ${PUC[l.c]}</td><td class="n" style="text-align:right">${l.s==="D"?fmt(l.v):""}</td><td class="n" style="text-align:right">${l.s==="H"?fmt(l.v):""}</td></tr>`).join("")}</table>Corrige tu asiento y pulsa Revisar.</div>`:""}</div></div>`;}).join("");
+ return`<div class="note">El banco cobró y abonó cosas que tu empresa no había registrado. Regístralas para que tus libros queden en <b>${fmt(C.conciliadoLibros)}</b>.</div>${cards}
+ ${completo()?`<div class="card c"><b>🎉 ¡Conciliación completa!</b><p>Ya puedes presentar la evaluación.</p><button data-t2="eval">Ir a la evaluación →</button></div>`:""}`;
+}
+function evalAj(a,x){
+ const vals=x.a.map(l=>{const d=parseM(l.d),hh=parseM(l.h);return{c:l.c,s:d>0&&hh===0?"D":(hh>0&&d===0?"H":""),v:d>0?d:hh,lleno:!!(l.c||d||hh)};});
+ const used=[],res=vals.map(()=>null);let found=0;
+ a.asiento.forEach(e=>{for(let i=0;i<vals.length;i++){if(used[i])continue;const v=vals[i];if(v.c===e.c&&v.s===e.s&&v.v===e.v){used[i]=1;res[i]=true;found++;break;}}});
+ vals.forEach((v,i)=>{if(res[i]===null&&v.lleno)res[i]=false;});
+ const llenos=vals.filter(v=>v.lleno).length;
+ return{ok:found===a.asiento.length&&llenos===a.asiento.length,found,total:a.asiento.length,lineOk:res};
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let q=1;while(set.length<4){const x=ok+q*1000;if(!set.includes(x))set.push(x);q++;}return set.slice(0,4).map(x=>({t:fmt(x),ok:x===ok}));}
+function construir(v,seed){
+ const Q=[],ch=C.cheques[0];
+ if(v==="A"){
+  Q.push({t:"¿Cuál es el saldo que aparece en el extracto de tu banco al 31 de octubre?",o:numOpts(C.saldoExtracto,[C.saldoLibros,C.concil,C.saldoExtracto+C.nd]),e:"Es el saldo final del extracto: "+fmt(C.saldoExtracto)+"."});
+  Q.push({t:"Verdadero o falso: un cheque girado y aún no cobrado se resta del saldo del extracto.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: ya salió de tus libros, pero el banco todavía no lo descuenta."});
+  Q.push({t:"¿Qué partida de tu conciliación necesita un asiento de ajuste en tus libros?",o:[
+   {t:"La nota débito por la cuota de manejo.",ok:true},
+   {t:"El cheque girado y no cobrado.",ok:false},
+   {t:"El abono en tránsito.",ok:false},
+   {t:"Ninguna: todo está registrado.",ok:false}],e:"La cuota de manejo la cobró el banco y tú no la habías registrado; los cheques pendientes y los abonos en tránsito ya están en tus libros."});
+  Q.push({t:"¿Cuál es el saldo conciliado de tu empresa?",o:numOpts(C.concil,[C.saldoLibros,C.saldoExtracto,C.concil+C.nd]),e:"Extracto "+fmt(C.saldoExtracto)+" + tránsito "+fmt(C.sumTransito)+" − cheques "+fmt(C.sumCheques)+" = "+fmt(C.concil)+"."});
+  Q.push({t:"Al registrar la nota débito por la cuota de manejo, el asiento es…",o:[
+   {t:"Debe: Gastos bancarios. Haber: Bancos.",ok:true},{t:"Debe: Bancos. Haber: Gastos bancarios.",ok:false},{t:"Debe: Bancos. Haber: Ingresos financieros.",ok:false},{t:"Debe: Gastos bancarios. Haber: Caja.",ok:false}],e:"Es un gasto (Debe) y sale plata del banco (Bancos al Haber)."});
+ }else{
+  Q.push({t:"¿Cuál era el saldo de Bancos en tus libros antes de los ajustes?",o:numOpts(C.saldoLibros,[C.saldoExtracto,C.conciliadoLibros,C.saldoLibros+C.nd]),e:"Es el saldo de tu libro de bancos: "+fmt(C.saldoLibros)+"."});
+  Q.push({t:"Verdadero o falso: los cheques girados y no cobrados requieren un asiento de ajuste en los libros.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: ya están registrados en tus libros; solo se restan en la conciliación."});
+  Q.push({t:"¿Por cuánto valor es el cheque girado y no cobrado de tu empresa (cheque No. "+ch.cheque+")?",o:numOpts(C.sumCheques,[C.sumTransito,C.nd+C.nc,C.sumCheques+C.sumTransito]),e:"El cheque No. "+ch.cheque+" es por "+fmt(C.sumCheques)+"."});
+  Q.push({t:"Después de registrar las notas del banco, ¿cuál es el saldo de Bancos en tus libros?",o:numOpts(C.conciliadoLibros,[C.saldoLibros,C.saldoExtracto,C.conciliadoLibros+C.nc]),e:"Libros "+fmt(C.saldoLibros)+" + intereses "+fmt(C.nc)+" − cuota de manejo "+fmt(C.nd)+" = "+fmt(C.conciliadoLibros)+"."});
+  Q.push({t:"El banco abona intereses a tu cuenta. En tus libros se registra…",o:[
+   {t:"Debe: Bancos. Haber: Ingresos financieros.",ok:true},{t:"Debe: Gastos bancarios. Haber: Bancos.",ok:false},{t:"Debe: Ingresos financieros. Haber: Bancos.",ok:false},{t:"Debe: Caja. Haber: Ingresos financieros.",ok:false}],e:"Entra plata al banco (Debe) y es un ingreso financiero (Haber)."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(!completo()&&!esDoc())return`<div class="card"><h3>🔒 La evaluación se abre al completar las tareas</h3><p class="mu">Te faltan ${total()-listos()}: comparar, conciliación y ajustes.</p></div>`;
+ if(!EV){const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";EV={v,qs:construir(v,hashStr("ev3"+EMP.n+v+n)),ans:{},fin:false};}
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){const nota=EV.nota,pasa=nota>=CFG.notaMinima;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎉 ¡Aprobaste la estación 3!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Se abrió la estación 4 · Inventarios y compras.":"Repasa tu conciliación y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-t2="con">Revisar mi conciliación</button></div></div>`;}
+ return`<div class="card"><h3>📝 Evaluación · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre la conciliación de tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>${EV.fin?res:""}${qs}${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-cot]").forEach(el=>el.onchange=()=>{T.cot.s[el.dataset.cot]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-con]").forEach(el=>el.oninput=()=>{T.con.v=T.con.v||{};T.con.v[el.dataset.con]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-aj]").forEach(el=>{const ch=()=>{T.aj[el.dataset.aj].a[+el.dataset.i][el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();};el.oninput=ch;el.onchange=ch;});
+ /* comparar */
+ document.querySelectorAll("[data-chkcot]").forEach(b=>b.onclick=async()=>{
+  const r={};let todo=true;
+  C.libros.forEach(l=>{const esp=(l===C.cheques[0]||l===C.transito[0])?"n":"s";r[l.id]=(T.cot.s[l.id]||"")===esp;if(!r[l.id])todo=false;});
+  C.extracto.forEach(e=>{const esp=(e.id==="END"||e.id==="ENC")?"n":"s";r[e.id]=(T.cot.s[e.id]||"")===esp;if(!r[e.id])todo=false;});
+  FB.cot=r;if(todo)T.cot.ok=1;else T.cot.tries=(T.cot.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seecot]").forEach(b=>b.onclick=async()=>{T.cot.seen=1;await guardar();keep(render);});
+ /* conciliación */
+ document.querySelectorAll("[data-chkcon]").forEach(b=>b.onclick=async()=>{
+  const r={};let todo=true;CF.forEach(f=>{r[f[0]]=parseM((T.con.v||{})[f[0]])===f[2]();if(!r[f[0]])todo=false;});
+  FB.con=r;if(todo)T.con.ok=1;else T.con.tries=(T.con.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seecon]").forEach(b=>b.onclick=async()=>{T.con.seen=1;await guardar();keep(render);});
+ /* ajustes */
+ document.querySelectorAll("[data-addaj]").forEach(b=>b.onclick=()=>{const x=T.aj[b.dataset.addaj];if(x.a.length<5){x.a.push({c:"",d:"",h:""});guardar();keep(render);}});
+ document.querySelectorAll("[data-chkaj]").forEach(b=>b.onclick=async()=>{
+  const a=C.ajustes.find(z=>z.k===b.dataset.chkaj),x=T.aj[a.k],r=evalAj(a,x);FB["aj"+a.k]=r;
+  if(r.ok)x.ok=1;else x.tries=(x.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seeaj]").forEach(b=>b.onclick=async()=>{T.aj[b.dataset.seeaj].seen=1;await guardar();keep(render);});
+ /* evaluación */
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);};
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>

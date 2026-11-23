@@ -12,7 +12,7 @@ const PUC={
  "310505":"Capital autorizado (capital suscrito y pagado)","413595":"Ingresos por venta de mercancías",
  "510506":"Sueldos","512010":"Arrendamientos – construcciones y edificaciones","513525":"Acueducto y alcantarillado",
  "513530":"Energía eléctrica","513535":"Teléfono e internet","519530":"Útiles, papelería y fotocopias",
- "530505":"Gastos bancarios","613595":"Costo de ventas – comercio"
+ "421005":"Ingresos financieros – intereses","530505":"Gastos bancarios","613595":"Costo de ventas – comercio"
 };
 const PUC_LIST=Object.keys(PUC).sort();
 
@@ -196,4 +196,58 @@ function generarMes(n){
   pista:"El costo de ventas es un gasto (Debe) y la mercancía vendida sale del inventario (Haber)."});
 
  return{n,emp,hechos:H,resumen:{capital,Ac,Ab,Pc,sTotal,costo,ivaGen:iva(s1)+iva(s2)+iva(s3)+iva(s4)},prod,PV,CL};
+}
+
+
+/* =====================================================================
+   CONCILIACIÓN BANCARIA · extracto del banco y ajustes (estación 3)
+   Se calcula con los MISMOS movimientos de la cuenta Bancos (111005) de los 19 hechos.
+   ===================================================================== */
+function conciliar(n){
+ const M=generarMes(n),emp=M.emp,R=mulberry32(hashStr("conc"+n));
+ const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+ const num=h=>{const m=(h.doc.partes.map(p=>p[1]).join(" ").match(/[Cc]heque No\. (\d+)/));return m?m[1]:"";};
+ const dOct=d=>String(d).padStart(2,"0")+" oct. 2026";
+ /* movimientos del libro de bancos (en orden de fecha) */
+ const L=[];let sal=0;
+ M.hechos.forEach(h=>{const l=h.asiento.find(x=>x.c==="111005");if(!l)return;
+  const d=l.s==="D"?l.v:0,hh=l.s==="H"?l.v:0;sal+=d-hh;
+  let con=h.t;
+  if(h.k==="compraCont"||h.k==="pagoProv")con="Cheque No. "+num(h)+" · "+h.t.replace(/ \(cheque\)/,"");
+  L.push({id:"L"+h.id,hecho:h.id,k:h.k,dia:h.dia,fecha:h.doc.fecha,concepto:con,d,h:hh,saldo:sal,cheque:num(h)});});
+ /* partidas conciliatorias de esta empresa */
+ const kCheque=(n%2===0)?"pagoProv":"compraCont";
+ const kTransito="cobro1";
+ const nd=Math.round(ri(14000,32000)/100)*100,nc=Math.round(ri(3000,12000)/100)*100;
+ /* extracto del banco */
+ const E=[];
+ L.forEach(m=>{
+  if(m.k===kCheque||m.k===kTransito)return;               // no aparecen en el extracto
+  let dia=m.dia,con=m.concepto;
+  if(m.k==="compraCont"||m.k==="pagoProv"){dia=Math.min(30,m.dia+ri(2,5));con="Cheque pagado No. "+m.cheque;}
+  else if(m.k==="aportes")con="Consignación inicial";
+  else if(m.k==="consig")con="Consignación en efectivo";
+  else if(m.k==="ventaBco"){dia=m.dia+1;con="Abono ventas con tarjeta (datáfono)";}
+  else if(m.k==="arriendo")con="Transferencia · arriendo del local";
+  else if(m.k==="energia")con="Pago PSE · energía";
+  else if(m.k==="nomina")con="Transferencia · nómina";
+  else if(m.k==="internet")con="Pago PSE · internet y teléfono";
+  E.push({id:"E"+m.id,ref:m.id,dia,fecha:dOct(dia),concepto:con,d:m.h,c:m.d});   // d = retiro (débito del banco), c = depósito (crédito del banco)
+ });
+ E.push({id:"END",ref:"ND",dia:30,fecha:dOct(30),concepto:"Cuota de manejo de la cuenta",d:nd,c:0});
+ E.push({id:"ENC",ref:"NC",dia:30,fecha:dOct(30),concepto:"Intereses de la cuenta",d:0,c:nc});
+ E.sort((a,b)=>a.dia-b.dia||(a.id<b.id?-1:1));
+ let s2=0;E.forEach(e=>{s2+=e.c-e.d;e.saldo=s2;});
+ const pc=L.find(m=>m.k===kCheque),pt=L.find(m=>m.k===kTransito);
+ const cheques=[pc],transito=[pt];
+ const sumCh=pc.h,sumTr=pt.d;
+ const extC=s2+sumTr-sumCh,libC=sal+nc-nd;
+ return{n,banco:emp.banco.n,cuenta:emp.cuenta,empresa:emp.nombre,
+  libros:L,extracto:E,saldoLibros:sal,saldoExtracto:s2,
+  cheques,transito,sumCheques:sumCh,sumTransito:sumTr,nd,nc,
+  concil:extC,conciliadoLibros:libC,cuadra:extC===libC,
+  ajustes:[
+   {k:"nd",t:"Nota débito: cuota de manejo de la cuenta",valor:nd,fecha:dOct(30),asiento:[{c:"530505",s:"D",v:nd},{c:"111005",s:"H",v:nd}],pista:"El banco cobró un gasto: los gastos bancarios van al Debe y como sale plata del banco, Bancos va al Haber."},
+   {k:"nc",t:"Nota crédito: intereses ganados",valor:nc,fecha:dOct(30),asiento:[{c:"111005",s:"D",v:nc},{c:"421005",s:"H",v:nc}],pista:"El banco abonó intereses: entra plata al banco (Debe) y es un ingreso financiero (Haber)."}
+  ]};
 }
