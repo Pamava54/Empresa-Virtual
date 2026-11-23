@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 2 · Libros contables · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.mv td,.mv th{padding:5px 8px;font-size:13px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.g4 label{font-size:12px;color:#5b6b7f;display:block;margin-bottom:2px}
+.g4 input,.g4 select{width:100%;text-align:right}
+@media(max-width:640px){.g4{grid-template-columns:1fr 1fr}}
+.bt input{width:100%;text-align:right;min-width:100px}
+.bt td,.bt th{padding:5px 8px;font-size:13px}
+.ok{border-color:#86efac!important;background:#f0fdf4!important}.bad{border-color:#fca5a5!important;background:#fff1f1!important}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 2 · LIBROS CONTABLES
+   Libro diario → Libro mayor → Balance de prueba → Evaluación A/B
+   Parte de los asientos correctos de la estación 1 (los mismos 19 hechos).
+   ===================================================================== */
+let SES=null,EMP=null,D=null,M=null,T=null,TAB="guia",FB={},EV=null,AG=null;
+const NE=2;
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ if(D.estaciones[NE].estado==="bloqueada"&&!esDoc()){location.href="index.html";return;}
+ M=generarMes(EMP.n);
+ AG=agregar();
+ T=D.trabajo.e2=D.trabajo.e2||{};
+ T.dia=T.dia||{};T.may=T.may||{};T.bal=T.bal||{};T.bal.r=T.bal.r||{};
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+function k(c){return"c"+c;}
+
+/* ----- cálculo de los libros (fuente de verdad) ----- */
+function agregar(){
+ const m={};
+ M.hechos.forEach(h=>h.asiento.forEach(l=>{
+  const a=m[l.c]||(m[l.c]={c:l.c,mov:[],D:0,H:0});
+  a.mov.push({id:h.id,fecha:h.doc.fecha,t:h.t,d:l.s==="D"?l.v:0,h:l.s==="H"?l.v:0});
+  if(l.s==="D")a.D+=l.v;else a.H+=l.v;
+ }));
+ return Object.values(m).sort((x,y)=>x.c<y.c?-1:1).map(a=>({...a,saldo:Math.abs(a.D-a.H),nat:a.D>=a.H?"D":"H"}));
+}
+function totDiario(){let t=0;M.hechos.forEach(h=>h.asiento.forEach(l=>{if(l.s==="D")t+=l.v;}));return t;}
+function sumBal(){let d=0,h=0;AG.forEach(a=>{if(a.nat==="D")d+=a.saldo;else h+=a.saldo;});return{d,h};}
+function A(c){return AG.find(a=>a.c===c);}
+function listos(){
+ let n=0;if(T.dia.ok)n++;AG.forEach(a=>{if((T.may[k(a.c)]||{}).ok)n++;});if(T.bal.ok)n++;return n;
+}
+function total(){return AG.length+2;}
+function completo(){return listos()===total();}
+
+function render(){
+ const nl=listos(),tt=total();
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. Verás siempre el botón “Ver solución”.</div>`:""}
+ <div class="card"><h2>📚 Estación 2 · Libros contables</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · octubre de 2026</div>
+  <div style="margin-top:8px" class="sm mu">Tareas completadas: ${nl} de ${tt}</div><div class="bar"><i style="width:${nl/tt*100}%"></i></div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes repasar todo lo que quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="dia"?"":"gr"}" data-t="dia">📒 Libro diario${T.dia.ok?" ✅":""}</button>
+  <button class="${TAB==="may"?"":"gr"}" data-t="may">🗂 Libro mayor (${AG.filter(a=>(T.may[k(a.c)]||{}).ok).length}/${AG.length})</button>
+  <button class="${TAB==="bal"?"":"gr"}" data-t="bal">⚖️ Balance de prueba${T.bal.ok?" ✅":""}</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="dia"?vDiario():TAB==="may"?vMayor():TAB==="bal"?vBalance():vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>De los asientos a los libros</h3>
+ <p>En la estación 1 registraste 19 asientos. Ahora vas a ver cómo esos mismos asientos se organizan en los <b>libros contables</b> y cómo se comprueba que todo cuadra.</p>
+ <div class="sc"><table><thead><tr><th>Libro</th><th>Qué contiene</th><th>Qué haces aquí</th></tr></thead><tbody>
+ <tr><td><b>Libro diario</b></td><td>Todos los asientos en <b>orden cronológico</b>, con su fecha y su comprobante.</td><td>Lo lees y compruebas que el total del Debe es igual al del Haber.</td></tr>
+ <tr><td><b>Libro mayor</b></td><td>Los movimientos agrupados <b>por cuenta</b> (una “T” por cada cuenta).</td><td>Por cada cuenta sumas el Debe, sumas el Haber y calculas el saldo.</td></tr>
+ <tr><td><b>Balance de prueba</b></td><td>La lista de los saldos de todas las cuentas.</td><td>Pasas cada saldo a su columna (deudor o acreedor) y verificas que las sumas son iguales.</td></tr></tbody></table></div></div>
+ <div class="card"><h3>Reglas para calcular el saldo</h3>
+ <ul><li><b>Saldo = el mayor menos el menor</b> entre la suma del Debe y la suma del Haber.</li>
+ <li>Si la suma del <b>Debe</b> es mayor, el saldo es <b>deudor</b>. Si la suma del <b>Haber</b> es mayor, es <b>acreedor</b>.</li>
+ <li>En el balance de prueba: saldo deudor → columna Debe; saldo acreedor → columna Haber.</li></ul></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li>Abre el <b>Libro diario</b>, revisa los asientos y escribe los totales del Debe y del Haber.</li>
+ <li>Pasa al <b>Libro mayor</b>: por cada cuenta, escribe la suma del Debe, la suma del Haber, el saldo y si es deudor o acreedor.</li>
+ <li>Termina con el <b>Balance de prueba</b>.</li>
+ <li>Con todo en verde, se abre la <b>Evaluación</b> (5 preguntas sobre tu empresa). Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 3.</li></ol>
+ <p class="sm mu">Si fallas dos veces en una tarea puedes ver la solución, y luego corriges lo tuyo hasta que quede bien.</p>
+ <div class="c"><button data-t2="dia">Empezar con el libro diario →</button></div></div>`;
+}
+
+/* ---------------- LIBRO DIARIO ---------------- */
+function vDiario(){
+ const d=T.dia,fb=FB.dia;
+ const rows=M.hechos.map(h=>`<tr><td colspan="4" style="background:#eef3fa"><b>CD-${String(h.id).padStart(3,"0")}</b> · ${esc(h.doc.fecha)} · ${esc(h.t)}</td></tr>`+
+  h.asiento.map(l=>`<tr><td></td><td>${l.c} · ${PUC[l.c]}</td><td class="n" style="text-align:right">${l.s==="D"?fmt(l.v):""}</td><td class="n" style="text-align:right">${l.s==="H"?fmt(l.v):""}</td></tr>`).join("")).join("");
+ const puedeVer=!d.ok&&!d.seen&&((d.tries||0)>=2||esDoc());
+ const cl=ok=>fb?(ok?"ok":"bad"):"";
+ return`<div class="card"><h3>📒 Libro diario · octubre de 2026</h3>
+ <p class="sm mu">Aquí están tus 19 asientos en orden de fecha. Suma toda la columna <b>Debe</b> y toda la columna <b>Haber</b>.</p>
+ <div class="sc"><table class="mv"><thead><tr><th style="width:12px"></th><th>Cuenta</th><th style="text-align:right">Debe</th><th style="text-align:right">Haber</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+ <div class="card"><h3>Totales del libro diario</h3>
+ <div class="g4" style="grid-template-columns:1fr 1fr"><div><label>Total Debe</label><input inputmode="numeric" data-dia="td" value="${esc(d.td||"")}" class="${cl(fb&&fb.td)}" ${d.ok?"disabled":""}></div>
+ <div><label>Total Haber</label><input inputmode="numeric" data-dia="th" value="${esc(d.th||"")}" class="${cl(fb&&fb.th)}" ${d.ok?"disabled":""}></div></div>
+ ${d.ok?`<div class="note sm" style="margin-top:10px">✅ Correcto: Debe y Haber son iguales (${fmt(totDiario())}). La partida doble se cumple en todo el mes.</div>`:`<div class="toolbar"><button data-chkdia="1">✔ Revisar</button>${puedeVer?`<button class="gr" data-seedia="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!d.ok?`<div class="note r sm">Algún total no es correcto. <b>Pista:</b> los dos totales deben ser iguales entre sí; si no te dan igual, revisa tu suma.</div>`:""}
+ ${d.seen&&!d.ok?`<div class="note sm"><b>Solución:</b> Debe ${fmt(totDiario())} · Haber ${fmt(totDiario())}. Corrige tus valores y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- LIBRO MAYOR ---------------- */
+function vMayor(){
+ const done=AG.filter(a=>(T.may[k(a.c)]||{}).ok).length;
+ const cards=AG.map(a=>{
+  const s=T.may[k(a.c)]||(T.may[k(a.c)]={}),fb=FB["m"+a.c];
+  const cl=f=>fb?(fb[f]?"ok":"bad"):"";
+  const puedeVer=!s.ok&&!s.seen&&((s.tries||0)>=2||esDoc());
+  const dis=s.ok?"disabled":"";
+  return`<div class="hc ${s.ok?"done":""}"><h3><span>${a.c} · ${PUC[a.c]}</span>${s.ok?`<span class="pill ok">✅ Correcto</span>`:s.seen?`<span class="pill w">👁 Visto</span>`:`<span class="pill">${a.mov.length} movimientos</span>`}</h3>
+  <div class="sc"><table class="mv"><thead><tr><th>Fecha</th><th>Hecho</th><th style="text-align:right">Debe</th><th style="text-align:right">Haber</th></tr></thead><tbody>
+  ${a.mov.map(m=>`<tr><td>${esc(m.fecha)}</td><td>Asiento ${m.id}</td><td class="n" style="text-align:right">${m.d?fmt(m.d):""}</td><td class="n" style="text-align:right">${m.h?fmt(m.h):""}</td></tr>`).join("")}</tbody></table></div>
+  <div class="g4">
+   <div><label>Suma del Debe</label><input inputmode="numeric" data-m="${a.c}" data-f="d" value="${esc(s.d||"")}" class="${cl("d")}" ${dis}></div>
+   <div><label>Suma del Haber</label><input inputmode="numeric" data-m="${a.c}" data-f="h" value="${esc(s.h||"")}" class="${cl("h")}" ${dis}></div>
+   <div><label>Saldo</label><input inputmode="numeric" data-m="${a.c}" data-f="s" value="${esc(s.s||"")}" class="${cl("s")}" ${dis}></div>
+   <div><label>El saldo es…</label><select data-m="${a.c}" data-f="n" class="${cl("n")}" ${dis}><option value="">—</option><option value="D" ${s.n==="D"?"selected":""}>Deudor</option><option value="H" ${s.n==="H"?"selected":""}>Acreedor</option></select></div>
+  </div>
+  ${s.ok?"":`<div class="toolbar"><button data-chkm="${a.c}">✔ Revisar</button>${puedeVer?`<button class="gr" data-seem="${a.c}">👁 Ver solución</button>`:""}</div>`}
+  ${fb&&!s.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> suma por separado la columna Debe y la columna Haber; el saldo es la diferencia entre las dos; es deudor si el Debe es mayor y acreedor si el Haber es mayor.</div>`:""}
+  ${s.seen&&!s.ok?`<div class="note sm"><b>Solución:</b> Debe ${fmt(a.D)} · Haber ${fmt(a.H)} · Saldo ${fmt(a.saldo)} ${a.nat==="D"?"deudor":"acreedor"}. Corrige y pulsa Revisar.</div>`:""}</div>`;}).join("");
+ return`<div class="note">Cada tarjeta es una cuenta con todos sus movimientos del mes, tomados de tus asientos. Completa las sumas y el saldo. Llevas ${done} de ${AG.length}.</div>${cards}
+ <div class="card c">${done===AG.length?`<b>🎉 ¡Mayor completo!</b><p>Ahora arma el balance de prueba.</p><button data-t2="bal">Ir al balance de prueba →</button>`:`<span class="mu">Te faltan ${AG.length-done} cuentas.</span>`}</div>`;
+}
+
+/* ---------------- BALANCE DE PRUEBA ---------------- */
+function vBalance(){
+ const b=T.bal,fb=FB.bal;
+ if(AG.filter(a=>(T.may[k(a.c)]||{}).ok).length<AG.length&&!esDoc()){
+  return`<div class="card"><h3>🔒 El balance se abre al completar el libro mayor</h3><p class="mu">Primero termina todas las cuentas del mayor.</p></div>`;
+ }
+ const cl=ok=>fb?(ok?"ok":"bad"):"";
+ const dis=b.ok?"disabled":"";
+ const rows=AG.map(a=>{const r=b.r[k(a.c)]||(b.r[k(a.c)]={});const f=fb&&fb.r[a.c];
+  return`<tr><td>${a.c}</td><td>${PUC[a.c]}</td><td><input inputmode="numeric" data-b="${a.c}" data-f="d" value="${esc(r.d||"")}" class="${cl(f&&f.d)}" ${dis}></td><td><input inputmode="numeric" data-b="${a.c}" data-f="h" value="${esc(r.h||"")}" class="${cl(f&&f.h)}" ${dis}></td></tr>`;}).join("");
+ const puedeVer=!b.ok&&!b.seen&&((b.tries||0)>=2||esDoc());
+ const sb=sumBal();
+ return`<div class="card"><h3>⚖️ Balance de prueba · 31 de octubre de 2026</h3>
+ <p class="sm mu">Escribe el saldo de cada cuenta en la columna que corresponde (deudor → Debe, acreedor → Haber) y deja en blanco la otra. Luego suma las dos columnas.</p>
+ <div class="sc"><table class="bt"><thead><tr><th>Código</th><th>Cuenta</th><th style="text-align:right">Saldo deudor</th><th style="text-align:right">Saldo acreedor</th></tr></thead><tbody>${rows}
+ <tr style="background:#eef3fa"><td colspan="2"><b>SUMAS IGUALES</b></td><td><input inputmode="numeric" data-bt="d" value="${esc(b.td||"")}" class="${cl(fb&&fb.td)}" ${dis}></td><td><input inputmode="numeric" data-bt="h" value="${esc(b.th||"")}" class="${cl(fb&&fb.th)}" ${dis}></td></tr></tbody></table></div>
+ ${b.ok?`<div class="note sm" style="margin-top:10px">✅ ¡Balance de prueba correcto! Las dos columnas suman ${fmt(sb.d)}.</div>`:`<div class="toolbar"><button data-chkb="1">✔ Revisar</button>${puedeVer?`<button class="gr" data-seeb="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!b.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> copia cada saldo de tu libro mayor a su columna; las dos columnas deben sumar lo mismo.</div>`:""}
+ ${b.seen&&!b.ok?`<div class="note sm"><b>Solución:</b><table style="margin-top:4px">${AG.map(a=>`<tr><td>${a.c} · ${PUC[a.c]}</td><td class="n" style="text-align:right">${a.nat==="D"?fmt(a.saldo):""}</td><td class="n" style="text-align:right">${a.nat==="H"?fmt(a.saldo):""}</td></tr>`).join("")}<tr><td><b>Sumas</b></td><td class="n" style="text-align:right"><b>${fmt(sb.d)}</b></td><td class="n" style="text-align:right"><b>${fmt(sb.h)}</b></td></tr></table>Corrige lo tuyo y pulsa Revisar.</div>`:""}</div>
+ ${completo()?`<div class="card c"><b>🎉 ¡Completaste los libros!</b><p>Ya puedes presentar la evaluación.</p><button data-t2="eval">Ir a la evaluación →</button></div>`:""}`;
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let q=1;while(set.length<4){const x=ok+q*1000;if(!set.includes(x))set.push(x);q++;}return set.slice(0,4).map(x=>({t:fmt(x),ok:x===ok}));}
+function natOpts(nat){return[{t:"Deudor",ok:nat==="D"},{t:"Acreedor",ok:nat==="H"}];}
+function construir(v,seed){
+ const Q=[],sb=sumBal();
+ if(v==="A"){
+  const caja=A("110505"),prov=A("220505"),inv=A("143505");
+  Q.push({t:"En el libro mayor de tu empresa, ¿cuál es el saldo de Caja (110505) al 31 de octubre?",o:numOpts(caja.saldo,[caja.D,caja.H,caja.D+caja.H]),e:"Saldo de Caja = Debe "+fmt(caja.D)+" menos Haber "+fmt(caja.H)+" = "+fmt(caja.saldo)+"."});
+  Q.push({t:"El saldo de Proveedores nacionales (220505) en tu mayor es…",o:natOpts(prov.nat),fixed:true,e:"Proveedores es un pasivo: "+(prov.nat==="H"?"el Haber supera al Debe, así que el saldo es acreedor.":"el Debe supera al Haber en tu caso, así que es deudor.")});
+  Q.push({t:"Verdadero o falso: en el balance de prueba, el total de los saldos deudores debe ser igual al total de los saldos acreedores.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: es la comprobación de la partida doble."});
+  Q.push({t:"¿Cuánto suma la columna de saldos deudores de tu balance de prueba?",o:numOpts(sb.d,[totDiario(),sb.d-caja.saldo,sb.d+caja.saldo]),e:"La suma de todos los saldos deudores es "+fmt(sb.d)+" y es igual a la de los acreedores."});
+  Q.push({t:"El libro mayor sirve para…",o:[
+   {t:"Agrupar los movimientos por cuenta y calcular su saldo.",ok:true},
+   {t:"Registrar los hechos solo en orden de fecha.",ok:false},
+   {t:"Calcular el IVA a pagar del año.",ok:false},
+   {t:"Conciliar el extracto bancario.",ok:false}],e:"El mayor reúne todos los movimientos de cada cuenta y permite saber su saldo."});
+ }else{
+  const ban=A("111005"),iva=A("240801"),inv=A("143505");
+  Q.push({t:"¿Cuál es el saldo de Bancos (111005) en el libro mayor de tu empresa?",o:numOpts(ban.saldo,[ban.D,ban.H,ban.D+ban.H]),e:"Saldo de Bancos = Debe "+fmt(ban.D)+" menos Haber "+fmt(ban.H)+" = "+fmt(ban.saldo)+"."});
+  Q.push({t:"El saldo de IVA generado (240801) en tu mayor es…",o:natOpts(iva.nat),fixed:true,e:"El IVA generado se cobra en las ventas y se registra en el Haber; su saldo es "+(iva.nat==="H"?"acreedor.":"deudor.")});
+  Q.push({t:"Verdadero o falso: en el libro diario los movimientos se agrupan por cuenta y no por fecha.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: el diario va en orden cronológico; el que agrupa por cuenta es el mayor."});
+  Q.push({t:"¿Cuánto suma el total del Debe de tu libro diario del mes?",o:numOpts(totDiario(),[sb.d,totDiario()-iva.saldo,totDiario()+iva.saldo]),e:"El total del Debe del diario es "+fmt(totDiario())+", igual al total del Haber."});
+  Q.push({t:"¿Cuál es el saldo de Inventarios de mercancías (143505) en tu mayor?",o:numOpts(inv.saldo,[inv.D,inv.H,inv.D+inv.H]),e:"Saldo = Debe "+fmt(inv.D)+" menos Haber "+fmt(inv.H)+" = "+fmt(inv.saldo)+" (las compras suben el inventario y el costo de ventas lo baja)."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(!completo()&&!esDoc()){
+  return`<div class="card"><h3>🔒 La evaluación se abre al completar los libros</h3><p class="mu">Te faltan ${total()-listos()} tareas: diario, mayor y balance de prueba.</p></div>`;
+ }
+ if(!EV){
+  const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";
+  EV={v,qs:construir(v,hashStr("ev2"+EMP.n+v+n)),ans:{},fin:false};
+ }
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{
+  const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}
+  ${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){
+  const nota=EV.nota,pasa=nota>=CFG.notaMinima;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div>
+  <h2>${pasa?"🎉 ¡Aprobaste la estación 2!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Se abrió la estación 3 · Conciliación bancaria.":"Repasa tus libros y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-t2="may">Revisar mis libros</button></div></div>`;
+ }
+ return`<div class="card"><h3>📝 Evaluación · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre los libros de tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>
+ ${EV.fin?res:""}${qs}
+ ${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-dia]").forEach(el=>el.oninput=()=>{T.dia[el.dataset.dia]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-m]").forEach(el=>{const ch=()=>{const s=T.may[k(el.dataset.m)]||(T.may[k(el.dataset.m)]={});s[el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();};el.oninput=ch;el.onchange=ch;});
+ document.querySelectorAll("[data-b]").forEach(el=>el.oninput=()=>{const r=T.bal.r[k(el.dataset.b)]||(T.bal.r[k(el.dataset.b)]={});r[el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-bt]").forEach(el=>el.oninput=()=>{T.bal[el.dataset.bt==="d"?"td":"th"]=el.value;el.classList.remove("ok","bad");guardar();});
+ /* diario */
+ document.querySelectorAll("[data-chkdia]").forEach(b=>b.onclick=async()=>{
+  const t=totDiario(),r={td:parseM(T.dia.td)===t,th:parseM(T.dia.th)===t};FB.dia=r;
+  if(r.td&&r.th)T.dia.ok=1;else T.dia.tries=(T.dia.tries||0)+1;
+  await guardar();keep(render);});
+ document.querySelectorAll("[data-seedia]").forEach(b=>b.onclick=async()=>{T.dia.seen=1;await guardar();keep(render);});
+ /* mayor */
+ document.querySelectorAll("[data-chkm]").forEach(b=>b.onclick=async()=>{
+  const a=A(b.dataset.chkm),s=T.may[k(a.c)]||(T.may[k(a.c)]={});
+  const r={d:parseM(s.d)===a.D,h:parseM(s.h)===a.H,s:parseM(s.s)===a.saldo,n:s.n===a.nat};FB["m"+a.c]=r;
+  if(r.d&&r.h&&r.s&&r.n)s.ok=1;else s.tries=(s.tries||0)+1;
+  await guardar();keep(render);});
+ document.querySelectorAll("[data-seem]").forEach(b=>b.onclick=async()=>{const s=T.may[k(b.dataset.seem)]||(T.may[k(b.dataset.seem)]={});s.seen=1;await guardar();keep(render);});
+ /* balance */
+ document.querySelectorAll("[data-chkb]").forEach(b=>b.onclick=async()=>{
+  const sb=sumBal(),r={r:{},td:parseM(T.bal.td)===sb.d,th:parseM(T.bal.th)===sb.h};let todo=r.td&&r.th;
+  AG.forEach(a=>{const x=T.bal.r[k(a.c)]||{};const ed=a.nat==="D"?a.saldo:0,eh=a.nat==="H"?a.saldo:0;
+   const f={d:parseM(x.d)===ed,h:parseM(x.h)===eh};r.r[a.c]=f;if(!f.d||!f.h)todo=false;});
+  FB.bal=r;if(todo)T.bal.ok=1;else T.bal.tries=(T.bal.tries||0)+1;
+  await guardar();keep(render);});
+ document.querySelectorAll("[data-seeb]").forEach(b=>b.onclick=async()=>{T.bal.seen=1;await guardar();keep(render);});
+ /* evaluación */
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;
+  const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);
+ };
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>
