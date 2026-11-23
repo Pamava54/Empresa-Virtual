@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 5 · Estados financieros · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.mv td,.mv th{padding:5px 8px;font-size:13px}
+.ok{border-color:#86efac!important;background:#f0fdf4!important}.bad{border-color:#fca5a5!important;background:#fff1f1!important}
+.fs{display:grid;grid-template-columns:1fr 190px;gap:6px 10px;align-items:center;margin-top:6px}
+.fs .hd{grid-column:1/-1;font-weight:700;background:#eef3fa;border-radius:8px;padding:6px 10px;margin-top:8px}
+.fs input,.fs select{width:100%;text-align:right}
+.fs .tt{font-weight:700}
+.fs .tt+input{font-weight:700}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 5 · ESTADOS FINANCIEROS
+   Balance de prueba ajustado → resultados → patrimonio → situación financiera → flujo de efectivo → notas
+   ===================================================================== */
+let SES=null,EMP=null,D=null,E=null,T=null,TAB="guia",FB={},EV=null;
+const NE=5;
+const TK=["er","pat","esf","fe","nt"];
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ if(D.estaciones[NE].estado==="bloqueada"&&!esDoc()){location.href="index.html";return;}
+ E=estados(EMP.n);
+ T=D.trabajo.e5=D.trabajo.e5||{};
+ TK.forEach(k=>{T[k]=T[k]||{};T[k].v=T[k].v||{};});
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+function listos(){return TK.filter(k=>T[k].ok).length;}
+function completo(){return listos()===TK.length;}
+function verOk(o){return!o.ok&&!o.seen&&((o.tries||0)>=2||esDoc());}
+function parseS(s){if(s==null)return 0;s=String(s).trim();if(!s)return 0;const neg=/^\s*[-−–(]/.test(s);const d=s.replace(/[^\d]/g,"");const v=d?parseInt(d,10):0;return neg?-v:v;}
+function fm(v){return v<0?"−"+fmt(-v):fmt(v);}
+
+/* ----- definición de cada estado: filas [tipo,id,etiqueta,valor] (h=título, i=dato, t=total) ----- */
+const e=()=>E;
+function filas(k){
+ const er=E.er,p=E.pat,f=E.esf,x=E.fe;
+ if(k==="er")return[
+  ["h","","Ingresos y costo"],["i","ing","Ingresos por venta de mercancías",er.ing],["i","cos","(−) Costo de ventas",er.cos],["t","ub","= Utilidad bruta",er.ub],
+  ["h","","Gastos de administración"],["i","suel","Sueldos",er.suel],["i","arr","Arrendamientos",er.arr],["i","ene","Energía eléctrica",er.ene],["i","tel","Teléfono e internet",er.tel],["i","uti","Útiles, papelería y fotocopias",er.uti],["t","tga","Total gastos de administración",er.tga],
+  ["t","uop","= Utilidad operacional",er.uop],
+  ["h","","Otros ingresos y gastos"],["i","ifin","(+) Ingresos financieros (intereses)",er.ifin],["i","gfin","(−) Gastos financieros (gastos bancarios)",er.gfin],["t","un","= Utilidad del ejercicio",er.un]];
+ if(k==="pat")return[
+  ["i","ini","Patrimonio al inicio del periodo (1 de octubre)",p.ini],["i","aportes","(+) Aportes de los socios (capital)",p.aportes],["i","util","(+) Utilidad del ejercicio",p.util],["t","fin","= Patrimonio al final del periodo",p.fin]];
+ if(k==="esf")return[
+  ["h","","ACTIVO CORRIENTE"],["i","caja","Caja general",f.caja],["i","banco","Bancos (saldo conciliado)",f.banco],["i","cli","Clientes nacionales",f.cli],["i","inv","Inventarios de mercancías",f.inv],["i","ivad","IVA descontable",f.ivad],["t","ac","Total activo corriente",f.ac],
+  ["h","","ACTIVO NO CORRIENTE"],["i","eq","Equipos de procesamiento de datos",f.eq],["t","act","TOTAL ACTIVOS",f.act],
+  ["h","","PASIVO CORRIENTE"],["i","prov","Proveedores nacionales",f.prov],["i","ivag","IVA generado",f.ivag],["t","pas","TOTAL PASIVOS",f.pas],
+  ["h","","PATRIMONIO"],["i","cap","Capital",f.cap],["i","util","Utilidad del ejercicio",f.util],["t","pat","TOTAL PATRIMONIO",f.pat],
+  ["t","pp","TOTAL PASIVOS + PATRIMONIO",f.pp]];
+ if(k==="fe")return[
+  ["h","","ACTIVIDADES DE OPERACIÓN"],["i","cob","Cobros a clientes (ventas de contado, datáfono y abonos)",x.cob],["i","prov","(−) Pagos a proveedores",x.prov],["i","gas","(−) Pagos de arriendo, servicios y papelería",x.gas],["i","nom","(−) Pagos de nómina",x.nom],["i","int","(+) Intereses recibidos del banco",x.int],["i","bco","(−) Gastos bancarios pagados",x.bco],["t","op","= Efectivo neto de las actividades de operación",x.op],
+  ["h","","ACTIVIDADES DE INVERSIÓN"],["i","inv","Compra de equipos pagada en efectivo",x.inv],
+  ["h","","ACTIVIDADES DE FINANCIACIÓN"],["i","fin","Aportes de los socios",x.fin],
+  ["t","var","= Aumento (o disminución) neto del efectivo",x.var],["i","ini","(+) Efectivo al inicio del periodo",x.ini],["t","final","= Efectivo al final del periodo",x.final]];
+ return[];
+}
+const PISTAS={
+ er:"Los ingresos y el costo de ventas salen del balance ajustado (cuentas 413595 y 613595). Cada gasto sale de su cuenta. Utilidad bruta = ingresos − costo; utilidad operacional = utilidad bruta − gastos de administración; utilidad del ejercicio = utilidad operacional + ingresos financieros − gastos financieros.",
+ pat:"El patrimonio empezó en cero. Sumas lo que aportaron los socios (cuenta 310505) y la utilidad que calculaste en el estado de resultados.",
+ esf:"Activos y pasivos salen de los saldos del balance ajustado. El patrimonio es el capital más la utilidad del ejercicio. Debe cumplirse: Activos = Pasivos + Patrimonio.",
+ fe:"Solo cuenta el dinero que realmente entró o salió de caja y bancos (los pagos incluyen IVA). Los cobros a clientes son únicamente lo recibido: las ventas a crédito aún no cobradas no cuentan. El equipo se compró a crédito, así que no mueve efectivo. Si el resultado es negativo, escríbelo con signo menos."
+};
+
+function render(){
+ const nl=listos(),tt=TK.length;
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. Verás siempre el botón “Ver solución”.</div>`:""}
+ <div class="card"><h2>📈 Estación 5 · Estados financieros</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · octubre de 2026</div>
+  <div style="margin-top:8px" class="sm mu">Estados completados: ${nl} de ${tt}</div><div class="bar"><i style="width:${nl/tt*100}%"></i></div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes repasar todo lo que quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="bal"?"":"gr"}" data-t="bal">⚖️ Balance ajustado</button>
+  <button class="${TAB==="er"?"":"gr"}" data-t="er">1. Resultados${T.er.ok?" ✅":""}</button>
+  <button class="${TAB==="pat"?"":"gr"}" data-t="pat">2. Patrimonio${T.pat.ok?" ✅":""}</button>
+  <button class="${TAB==="esf"?"":"gr"}" data-t="esf">3. Situación financiera${T.esf.ok?" ✅":""}</button>
+  <button class="${TAB==="fe"?"":"gr"}" data-t="fe">4. Flujo de efectivo${T.fe.ok?" ✅":""}</button>
+  <button class="${TAB==="nt"?"":"gr"}" data-t="nt">5. Notas${T.nt.ok?" ✅":""}</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="bal"?vBal():TK.includes(TAB)?vEstado(TAB):vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>Los estados financieros: el resultado de todo tu trabajo</h3>
+ <p>Con todo lo que hiciste en las estaciones anteriores (asientos, libros, conciliación e inventario) ya puedes presentar la información de tu empresa como lo hace un contador.</p>
+ <div class="sc"><table><thead><tr><th>Estado</th><th>Qué responde</th></tr></thead><tbody>
+ <tr><td><b>Estado de resultados</b></td><td>¿La empresa ganó o perdió en octubre? Ingresos − costos − gastos.</td></tr>
+ <tr><td><b>Estado de cambios en el patrimonio</b></td><td>¿Cómo cambió lo que valen los socios en la empresa?</td></tr>
+ <tr><td><b>Estado de situación financiera</b></td><td>¿Qué tiene (activos), qué debe (pasivos) y qué es de los socios (patrimonio) al 31 de octubre?</td></tr>
+ <tr><td><b>Estado de flujo de efectivo</b></td><td>¿De dónde entró y a dónde salió el dinero en caja y bancos?</td></tr>
+ <tr><td><b>Notas</b></td><td>Explicaciones de las cifras y de las políticas que se usaron.</td></tr></tbody></table></div></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li>Mira el <b>Balance ajustado</b>: es el balance de prueba de la estación 2 más las notas del banco de la estación 3 (cuota de manejo e intereses). De ahí salen todas las cifras.</li>
+ <li>Completa en orden: <b>Resultados → Patrimonio → Situación financiera → Flujo de efectivo → Notas</b>. Cada estado usa el anterior.</li>
+ <li>Pulsa <b>Revisar</b>; las casillas incorrectas se ponen en rojo. Con dos intentos fallidos puedes ver la solución y luego corriges lo tuyo.</li>
+ <li>Al terminar los 5, presentas la <b>Evaluación</b> (5 preguntas sobre tu empresa). Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 6.</li></ol>
+ <p class="sm mu">Simplificaciones de este ejercicio: no se calcula depreciación ni impuesto de renta, y el IVA se presenta sin compensar.</p>
+ <div class="c"><button data-t2="bal">Ver el balance ajustado →</button></div></div>`;
+}
+
+/* ---------------- BALANCE AJUSTADO ---------------- */
+function vBal(){
+ return`<div class="card"><h3>⚖️ Balance de prueba ajustado · 31 de octubre de 2026</h3>
+ <p class="sm mu">Es tu balance de prueba (estación 2) con las dos notas del banco que registraste en la estación 3: la cuota de manejo (gastos bancarios) y los intereses (ingresos financieros). Por eso Bancos coincide con tu saldo conciliado.</p>
+ <div class="sc"><table class="mv"><thead><tr><th>Código</th><th>Cuenta</th><th style="text-align:right">Saldo deudor</th><th style="text-align:right">Saldo acreedor</th></tr></thead><tbody>
+ ${E.bal.map(b=>`<tr><td>${b.c}</td><td>${esc(b.nom)}</td><td class="n" style="text-align:right">${b.d?fmt(b.d):""}</td><td class="n" style="text-align:right">${b.h?fmt(b.h):""}</td></tr>`).join("")}
+ <tr style="background:#eef3fa"><td colspan="2"><b>SUMAS IGUALES</b></td><td class="n" style="text-align:right"><b>${fmt(E.sumD)}</b></td><td class="n" style="text-align:right"><b>${fmt(E.sumH)}</b></td></tr></tbody></table></div>
+ <div class="c" style="margin-top:12px"><button data-t2="er">Empezar con el estado de resultados →</button></div></div>`;
+}
+
+/* ---------------- ESTADOS ---------------- */
+const TITULOS={er:["📊 Estado de resultados","Del 1 al 31 de octubre de 2026"],pat:["🏛 Estado de cambios en el patrimonio","Del 1 al 31 de octubre de 2026"],esf:["🧾 Estado de situación financiera","Al 31 de octubre de 2026"],fe:["💵 Estado de flujo de efectivo (método directo)","Del 1 al 31 de octubre de 2026"],nt:["",""]};
+const PREV={pat:"er",esf:"pat",fe:"esf",nt:"fe"};
+function bloqueado(k){return PREV[k]&&!T[PREV[k]].ok&&!esDoc();}
+function vEstado(k){
+ if(k==="nt")return vNotas();
+ if(bloqueado(k))return`<div class="card"><h3>🔒 Primero termina el estado anterior</h3><p class="mu">Completa “${TITULOS[PREV[k]][0]}” para abrir este.</p></div>`;
+ const o=T[k],fb=FB[k],dis=o.ok?"disabled":"",F=filas(k);
+ const body=F.map(r=>{if(r[0]==="h")return`<div class="hd">${esc(r[2])}</div>`;
+  const cl=fb?(fb[r[1]]?"ok":"bad"):"";
+  return`<span class="${r[0]==="t"?"tt":""}">${esc(r[2])}</span><input inputmode="numeric" data-st="${k}" data-id="${r[1]}" value="${esc(o.v[r[1]]||"")}" class="${cl}" ${dis}>`;}).join("");
+ const nxt={er:"pat",pat:"esf",esf:"fe",fe:"nt"}[k];
+ return`<div class="card"><h3>${TITULOS[k][0]}</h3><div class="sm mu">${esc(EMP.nombre)} · ${TITULOS[k][1]}</div>
+ <div class="fs">${body}</div>
+ ${o.ok?`<div class="note sm" style="margin-top:12px">✅ ¡Correcto!${k==="er"?` La utilidad del ejercicio es <b>${fmt(E.er.un)}</b>.`:k==="esf"?` Activos = Pasivos + Patrimonio = <b>${fmt(E.esf.act)}</b>. ¡El balance cuadra!`:k==="fe"?` El efectivo final (<b>${fmt(E.fe.final)}</b>) es igual a Caja + Bancos del balance.`:""}</div><div class="c"><button data-t2="${nxt}">Siguiente →</button></div>`:`<div class="toolbar"><button data-chkst="${k}">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seest="${k}">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> ${esc(PISTAS[k])}</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b><table style="margin-top:4px">${F.filter(r=>r[0]!=="h").map(r=>`<tr><td>${esc(r[2])}</td><td class="n" style="text-align:right">${fm(r[3])}</td></tr>`).join("")}</table>Corrige lo tuyo y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- NOTAS ---------------- */
+function vNotas(){
+ if(bloqueado("nt"))return`<div class="card"><h3>🔒 Primero termina el flujo de efectivo</h3></div>`;
+ const o=T.nt,fb=FB.nt,dis=o.ok?"disabled":"",N=E.notas;
+ const cl=id=>fb?(fb[id]?"ok":"bad"):"";
+ const inp=(id,l)=>`<span>${l}</span><input inputmode="numeric" data-nt="${id}" value="${esc(o.v[id]||"")}" class="${cl(id)}" ${dis}>`;
+ return`<div class="card"><h3>📝 Notas a los estados financieros</h3><div class="sm mu">${esc(EMP.nombre)} · 31 de octubre de 2026</div>
+ <div class="fs">
+ <div class="hd">Nota 1 · Efectivo y equivalentes de efectivo</div>${inp("caja","Efectivo en caja general")}${inp("banco","Saldo en bancos (conciliado con el extracto)")}
+ <div class="hd">Nota 2 · Inventarios</div>${inp("inv","Valor de los inventarios de mercancías")}
+ <span>Método de valoración del inventario</span><select data-nt="metodo" class="${cl("metodo")}" ${dis}><option value="">—</option><option value="p" ${o.v.metodo==="p"?"selected":""}>Promedio ponderado</option><option value="f" ${o.v.metodo==="f"?"selected":""}>PEPS (primeras en entrar, primeras en salir)</option><option value="u" ${o.v.metodo==="u"?"selected":""}>Último precio de compra</option></select>
+ <div class="hd">Nota 3 · Cuentas por cobrar y por pagar</div>${inp("cli","Saldo de clientes por cobrar")}${inp("prov","Saldo de proveedores por pagar")}
+ </div>
+ ${o.ok?`<div class="note sm" style="margin-top:12px">✅ ¡Correcto! Estas notas explican las cifras de tu situación financiera.</div>${completo()?`<div class="c"><button data-t2="eval">Ir a la evaluación →</button></div>`:""}`:`<div class="toolbar"><button data-chknt="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seent="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> las cifras salen del estado de situación financiera. El método de inventarios es el que usaste en la estación 4.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b> Caja ${fmt(N.caja)} · Bancos ${fmt(N.banco)} · Inventarios ${fmt(N.inv)} (promedio ponderado) · Clientes ${fmt(N.cli)} · Proveedores ${fmt(N.prov)}. Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let q=1;while(set.length<4){const x=ok+q*1000;if(!set.includes(x))set.push(x);q++;}return set.slice(0,4).map(x=>({t:fmt(x),ok:x===ok}));}
+function construir(v,seed){
+ const Q=[],er=E.er,f=E.esf,x=E.fe;
+ if(v==="A"){
+  Q.push({t:"¿Cuál fue la utilidad del ejercicio de tu empresa en octubre?",o:numOpts(er.un,[er.ub,er.uop,er.un+er.gfin]),e:"Utilidad bruta "+fmt(er.ub)+" − gastos "+fmt(er.tga)+" + intereses "+fmt(er.ifin)+" − gastos bancarios "+fmt(er.gfin)+" = "+fmt(er.un)+"."});
+  Q.push({t:"Verdadero o falso: en el estado de situación financiera, el total de los activos es igual al total de pasivos más patrimonio.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: es la ecuación contable y confirma que todo cuadra."});
+  Q.push({t:"¿A cuánto ascienden los activos totales de tu empresa al 31 de octubre?",o:numOpts(f.act,[f.pp-f.cap,f.ac,f.act-f.eq+f.cli]),e:"Activo corriente "+fmt(f.ac)+" + equipos "+fmt(f.eq)+" = "+fmt(f.act)+"."});
+  Q.push({t:"¿Con cuánto efectivo (caja + bancos) terminó tu empresa el mes?",o:numOpts(f.efe,[f.caja,f.banco,f.efe+er.un]),e:"Caja "+fmt(f.caja)+" + bancos "+fmt(f.banco)+" = "+fmt(f.efe)+", y es igual al efectivo final del flujo de efectivo."});
+  Q.push({t:"El estado de resultados muestra…",o:[
+   {t:"Los ingresos, costos y gastos de un periodo y la utilidad o pérdida.",ok:true},
+   {t:"Lo que la empresa tiene y debe en una fecha.",ok:false},
+   {t:"Únicamente los saldos del banco.",ok:false},
+   {t:"El detalle de las unidades del kardex.",ok:false}],e:"El estado de resultados mide el desempeño del periodo; lo que tiene y debe lo muestra la situación financiera."});
+ }else{
+  Q.push({t:"¿Cuál es el patrimonio total de tu empresa al 31 de octubre?",o:numOpts(f.pat,[f.cap,er.un,f.pas]),e:"Capital "+fmt(f.cap)+" + utilidad del ejercicio "+fmt(f.util)+" = "+fmt(f.pat)+"."});
+  Q.push({t:"Verdadero o falso: la utilidad del ejercicio aparece en el estado de resultados y también hace parte del patrimonio en la situación financiera.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: la utilidad aumenta el patrimonio de los socios."});
+  Q.push({t:"¿A cuánto ascienden los pasivos totales de tu empresa?",o:numOpts(f.pas,[f.prov,f.ivag,f.pat]),e:"Proveedores "+fmt(f.prov)+" + IVA generado "+fmt(f.ivag)+" = "+fmt(f.pas)+"."});
+  Q.push({t:"¿Cuánto sumaron los gastos de administración de tu empresa en octubre?",o:numOpts(er.tga,[er.suel,er.ub,er.tga+er.gfin]),e:"Sueldos, arriendo, energía, teléfono e internet y útiles suman "+fmt(er.tga)+"."});
+  Q.push({t:"¿Cuánto efectivo recibió tu empresa en octubre por cobros a clientes (ventas de contado, datáfono y abonos)?",o:numOpts(x.cob,[er.ing,f.cli,x.cob+x.fin]),e:"En el flujo de efectivo solo cuenta lo realmente cobrado: "+fmt(x.cob)+". Las ventas a crédito pendientes están en Clientes."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(!completo()&&!esDoc())return`<div class="card"><h3>🔒 La evaluación se abre al completar los 5 estados</h3><p class="mu">Te faltan ${TK.length-listos()}.</p></div>`;
+ if(!EV){const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";EV={v,qs:construir(v,hashStr("ev5"+EMP.n+v+n)),ans:{},fin:false};}
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){const nota=EV.nota,pasa=nota>=CFG.notaMinima;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎉 ¡Aprobaste la estación 5!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Se abrió la estación 6 · Simulador contable PAMAVA.":"Repasa tus estados y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-t2="esf">Revisar mis estados</button></div></div>`;}
+ return`<div class="card"><h3>📝 Evaluación · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre los estados financieros de tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>${EV.fin?res:""}${qs}${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-st]").forEach(el=>el.oninput=()=>{T[el.dataset.st].v[el.dataset.id]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-nt]").forEach(el=>{const ch=()=>{T.nt.v[el.dataset.nt]=el.value;el.classList.remove("ok","bad");guardar();};el.oninput=ch;el.onchange=ch;});
+ document.querySelectorAll("[data-chkst]").forEach(b=>b.onclick=async()=>{
+  const k=b.dataset.chkst,o=T[k],r={};let todo=true;
+  filas(k).filter(x=>x[0]!=="h").forEach(x=>{r[x[1]]=parseS(o.v[x[1]])===x[3];if(!r[x[1]])todo=false;});
+  FB[k]=r;if(todo)o.ok=1;else o.tries=(o.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seest]").forEach(b=>b.onclick=async()=>{T[b.dataset.seest].seen=1;await guardar();keep(render);});
+ document.querySelectorAll("[data-chknt]").forEach(b=>b.onclick=async()=>{
+  const o=T.nt,N=E.notas,r={caja:parseS(o.v.caja)===N.caja,banco:parseS(o.v.banco)===N.banco,inv:parseS(o.v.inv)===N.inv,metodo:o.v.metodo==="p",cli:parseS(o.v.cli)===N.cli,prov:parseS(o.v.prov)===N.prov};
+  FB.nt=r;if(Object.values(r).every(Boolean))o.ok=1;else o.tries=(o.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seent]").forEach(b=>b.onclick=async()=>{T.nt.seen=1;await guardar();keep(render);});
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);};
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>

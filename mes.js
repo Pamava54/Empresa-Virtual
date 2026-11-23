@@ -48,7 +48,7 @@ function generarMes(n){
  const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
  const F=FLAVOR[n],prod=F[0],PV=F[1],CL=F[2];
  const emp=EMPRESAS[n-1];
- const esc=0.7+R()*1.3;
+ const esc=1.2+R()*0.9;
  const rr=(lo,hi,step)=>Math.max(step,Math.round((lo+R()*(hi-lo))*esc/step)*step);
  const iva=b=>Math.round(b*0.19);
  const miNit=emp.nit;
@@ -62,7 +62,7 @@ function generarMes(n){
  const S=Math.round(Pc*0.95/1000)*1000;
  // ---- ventas en unidades (para el kardex): precio de venta por unidad y cantidades ----
  const QT=q1+q2+q3,avg0=Pc/QT;
- const pv=Math.max(50,Math.round(avg0*(1.25+R()*0.2)/50)*50);
+ const pv=Math.max(50,Math.round(avg0*(1.30+R()*0.2)/50)*50);
  const Qs=Math.max(8,Math.round(S/pv));
  const cap=Math.floor(0.85*(q1+q2));
  const eu0=Math.min(Math.round(Qs*0.72),cap);
@@ -75,7 +75,9 @@ function generarMes(n){
  const KD=calcKardex({q1,u1,q2,u2,q3,u3,qs1,qs2,qs3,qs4});
  const costo=KD.costo;
  const eq=rr(1200000,3500000,10000);
- const arr=rr(500000,1800000,10000),ene=rr(120000,450000,1000),net=rr(90000,260000,1000),nom=rr(900000,2400000,10000),util=rr(30000,90000,1000);
+ // gastos del mes en proporción a la utilidad bruta (para que la empresa tenga un resultado realista)
+ const ub=sTotal-costo,gt=ub*(0.50+R()*0.22),fl=Math.min(1,gt/400000);
+ const arr=Math.max(Math.round(100000*fl/1000)*1000,Math.round(gt*0.30/10000)*10000),nom=Math.max(Math.round(200000*fl/1000)*1000,Math.round(gt*0.42/10000)*10000),ene=Math.max(Math.round(40000*fl/1000)*1000,Math.round(gt*0.12/1000)*1000),net=Math.max(Math.round(30000*fl/1000)*1000,Math.round(gt*0.10/1000)*1000),util=Math.max(Math.round(15000*fl/1000)*1000,Math.round(gt*0.06/1000)*1000);
  const pagoProv=Math.round(tot(c1)*0.6/1000)*1000;
  const cobro1=Math.round(tot(s1)*0.5/1000)*1000;
  const cobro2=Math.round(tot(s4)*0.4/1000)*1000;
@@ -287,4 +289,37 @@ function kardex(n){
  K.uVendidas=K.lineas.filter(l=>l.tipo==="V").reduce((a,l)=>a+l.q,0);
  K.uCompradas=K.lineas.filter(l=>l.tipo==="C").reduce((a,l)=>a+l.q,0);
  return K;
+}
+
+/* =====================================================================
+   ESTADOS FINANCIEROS (estación 5)
+   Parten de los 19 hechos + los 2 ajustes del banco de la estación 3.
+   Sin impuesto de renta ni depreciación (simplificación didáctica).
+   ===================================================================== */
+function estados(n){
+ const M=generarMes(n),K=kardex(n),C=conciliar(n);
+ const a={};const add=(c,s,v)=>{a[c]=(a[c]||0)+(s==="D"?v:-v);};
+ M.hechos.forEach(h=>h.asiento.forEach(l=>add(l.c,l.s,l.v)));
+ C.ajustes.forEach(x=>x.asiento.forEach(l=>add(l.c,l.s,l.v)));
+ const sd=c=>a[c]||0;
+ const bal=Object.keys(a).sort().map(c=>({c,nom:PUC[c],d:a[c]>0?a[c]:0,h:a[c]<0?-a[c]:0}));
+ const E={n,empresa:M.emp.nombre,bal,
+  sumD:bal.reduce((s,x)=>s+x.d,0),sumH:bal.reduce((s,x)=>s+x.h,0)};
+ /* estado de resultados */
+ const er={ing:-sd("413595"),cos:sd("613595"),suel:sd("510506"),arr:sd("512010"),ene:sd("513530"),tel:sd("513535"),uti:sd("519530"),ifin:-sd("421005"),gfin:sd("530505")};
+ er.ub=er.ing-er.cos;er.tga=er.suel+er.arr+er.ene+er.tel+er.uti;er.uop=er.ub-er.tga;er.un=er.uop+er.ifin-er.gfin;
+ E.er=er;
+ /* cambios en el patrimonio */
+ const pat={ini:0,aportes:-sd("310505"),util:er.un};pat.fin=pat.ini+pat.aportes+pat.util;E.pat=pat;
+ /* situación financiera */
+ const f={caja:sd("110505"),banco:sd("111005"),cli:sd("130505"),inv:sd("143505"),ivad:sd("240802"),eq:sd("152805"),prov:-sd("220505"),ivag:-sd("240801"),cap:-sd("310505"),util:er.un};
+ f.efe=f.caja+f.banco;f.ac=f.efe+f.cli+f.inv+f.ivad;f.act=f.ac+f.eq;f.pas=f.prov+f.ivag;f.pat=f.cap+f.util;f.pp=f.pas+f.pat;f.cuadra=f.act===f.pp;E.esf=f;
+ /* flujo de efectivo (método directo) */
+ const cat={aportes:"fin",ventaEf:"cob",ventaBco:"cob",cobro1:"cob",cobro2:"cob",compraCont:"prov",pagoProv:"prov",arriendo:"gas",energia:"gas",internet:"gas",utiles:"gas",nomina:"nom"};
+ const fe={cob:0,prov:0,gas:0,nom:0,int:C.nc,bco:C.nd,inv:0,fin:0};
+ M.hechos.forEach(h=>{const c=cat[h.k];if(!c)return;const d=h.asiento.filter(l=>l.c==="110505"||l.c==="111005").reduce((s,l)=>s+(l.s==="D"?l.v:-l.v),0);
+  if(c==="cob")fe.cob+=d;else if(c==="fin")fe.fin+=d;else fe[c]+=-d;});
+ fe.op=fe.cob-fe.prov-fe.gas-fe.nom+fe.int-fe.bco;fe.var=fe.op+fe.inv+fe.fin;fe.ini=0;fe.final=fe.ini+fe.var;fe.cuadra=fe.final===f.efe;E.fe=fe;
+ E.notas={caja:f.caja,banco:f.banco,inv:f.inv,metodo:"p",cli:f.cli,prov:f.prov};
+ return E;
 }
