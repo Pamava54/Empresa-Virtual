@@ -77,7 +77,7 @@ function vGuia(){
  <li>Debajo de cada documento arma el asiento: elige la <b>cuenta</b> y escribe el valor en <b>Debe</b> o en <b>Haber</b>. Con “+ línea” agregas más cuentas.</li>
  <li>Pulsa <b>Revisar</b>. Si está bien, se pone en verde. Si no, te doy una pista. Con dos intentos fallidos puedes ver el asiento correcto.</li>
  <li>Cuando completes los 19, se abre la <b>Evaluación</b> de 5 preguntas sobre tu propia empresa. Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 2.</li></ol>
- <div class="c"><button data-t2="hechos">Empezar con los hechos →</button></div></div>
+ <div class="c"><button data-t2="hechos">Empezar con los hechos →</button> <button class="gr" onclick="window.open('documentos.html','_blank')">🖨 Imprimir mis documentos</button></div></div>
  <div class="card"><h3>Cuentas que vas a usar</h3><div class="sc"><table><tbody>${PUC_LIST.map(c=>`<tr><td><b>${c}</b></td><td>${PUC[c]}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 

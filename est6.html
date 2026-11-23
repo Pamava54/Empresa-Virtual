@@ -138,7 +138,7 @@ function vMision(){
  <div class="note sm" style="margin-top:10px">En los documentos con producto, el simulador ya tiene tu producto “Mercancía: ${esc(ev.prod)}” con IVA 19%. El precio y la cantidad los escribes tal como salen en la factura original. Los documentos de gasto, recibos y comprobantes usan los terceros que ya están creados.</div></div>
  <div class="card"><h3>Terceros que ya tienes creados</h3><div class="sc"><table class="mv"><thead><tr><th>Tipo</th><th>Nombre</th><th>NIT</th></tr></thead><tbody>
  ${ev.prov.map(p=>`<tr><td>Proveedor</td><td>${esc(p.nombre)}</td><td>${esc(p.nit)}</td></tr>`).join("")}${ev.cli.map(p=>`<tr><td>Cliente</td><td>${esc(p.nombre)}</td><td>${esc(p.nit)}</td></tr>`).join("")}</tbody></table></div>
- <div class="c" style="margin-top:12px"><button class="big2" data-open="1">Abrir el simulador →</button></div></div>`;
+ <div class="c" style="margin-top:12px"><button class="big2" data-open="1">Abrir el simulador →</button> <button class="gr" onclick="window.open('documentos.html','_blank')">🖨 Imprimir mis documentos</button></div></div>`;
 }
 
 /* ---------------- REVISAR ---------------- */

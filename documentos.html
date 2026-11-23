@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mis documentos · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+@page{size:letter;margin:9mm}
+.bar{max-width:820px;margin:0 auto;padding:12px}
+.hoja{width:100%;max-width:820px;margin:0 auto 14px;background:#fff;border:1px solid var(--bd)}
+.cel{position:relative;padding:8px 10px;border-bottom:1px dashed #b6c2d4;overflow:hidden;break-inside:avoid}
+.cel:last-child{border-bottom:0}
+.cel .mk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;color:rgba(29,78,216,.07);transform:rotate(-14deg);pointer-events:none}
+.cel .nn{font-size:10.5px;color:#64748b;text-align:right;margin-bottom:3px}
+.cel .doc{box-shadow:none;font-size:12.5px}
+.cel .doc table{font-size:12px}
+.cel .doc .dp{font-size:11.5px;padding:7px 12px}
+.cel .doc .dh{padding:6px 12px}
+.pieh{font-size:10px;color:#64748b;text-align:center;padding:3px}
+.ext table{width:100%;border-collapse:collapse;font-size:12px}.ext th{background:#eef3fa;padding:4px 6px;text-align:left;font-size:11px;text-transform:uppercase}.ext td{padding:3px 6px;border-top:1px solid #edf0f4}.ext td.n,.ext th.n{text-align:right}
+@media print{
+ body{background:#fff}.wm,.bar{display:none!important}#app{padding:0;max-width:none}
+ .hoja{border:0;margin:0;max-width:none;break-after:page;height:252mm;display:flex;flex-direction:column}
+ .hoja .cel{flex:1;min-height:0}
+ .hoja:last-child{break-after:auto}
+ #toast,.toast{display:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* Documentos de la empresa para imprimir (3 por hoja carta) */
+(async()=>{
+ await Store.init();
+ const SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ const EMP=EMPRESAS[SES.n-1],M=generarMes(EMP.n),C=conciliar(EMP.n);
+ const docs=M.hechos.filter(h=>h.k!=="costo");
+ const docHtml=d=>`<div class="doc"><div class="dh"><b>${esc(d.tit)}</b><span>No. ${esc(d.num)} · ${esc(d.fecha)}</span></div>
+ <div class="dp">${d.partes.map(p=>`<div><span class="mu">${esc(p[0])}:</span> <b>${esc(p[1])}</b></div>`).join("")}</div>
+ ${d.filas?`<table><thead><tr><th>Descripción</th><th class="n">Cant.</th><th class="n">Vr. unitario</th><th class="n">Vr. total</th></tr></thead><tbody>${d.filas.map(f=>`<tr><td>${esc(f[0])}</td><td class="n">${f[1]}</td><td class="n">${fmt(f[2])}</td><td class="n">${fmt(f[3])}</td></tr>`).join("")}</tbody></table>`:""}
+ <div class="tt">${d.tot.map((t,i)=>`<div class="${i===d.tot.length-1?"t":""}"><span>${esc(t[0])}</span><span>${esc(t[1])}</span></div>`).join("")}</div></div>`;
+ const celda=(i,tot,html)=>`<div class="cel"><div class="mk">PAMAVA soluciones</div><div class="nn">${esc(EMP.nombre)} · Documento ${i} de ${tot}</div>${html}</div>`;
+ const total=docs.length+1;
+ const cels=docs.map((h,i)=>celda(i+1,total,docHtml(h.doc)));
+ const ext=`<div class="ext"><div class="doc"><div class="dh"><b>EXTRACTO BANCARIO</b><span>${esc(C.banco)} · Octubre de 2026</span></div>
+  <div class="dp"><div><span class="mu">Titular:</span> <b>${esc(EMP.nombre)}</b></div><div><span class="mu">Cuenta:</span> <b>${esc(C.cuenta)}</b></div></div>
+  <table><thead><tr><th>Fecha</th><th>Descripción</th><th class="n">Retiros</th><th class="n">Depósitos</th><th class="n">Saldo</th></tr></thead><tbody>
+  ${C.extracto.map(e=>`<tr><td>${esc(e.fecha)}</td><td>${esc(e.concepto)}</td><td class="n">${e.d?fmt(e.d):""}</td><td class="n">${e.c?fmt(e.c):""}</td><td class="n">${fmt(e.saldo)}</td></tr>`).join("")}
+  <tr><td colspan="4"><b>Saldo al 31 de octubre</b></td><td class="n"><b>${fmt(C.saldoExtracto)}</b></td></tr></tbody></table></div></div>`;
+ cels.push(celda(total,total,ext));
+ const hojas=[];for(let i=0;i<cels.length;i+=3)hojas.push(`<div class="hoja">${cels.slice(i,i+3).join("")}<div class="pieh">PAMAVA soluciones · Empresa ${EMP.n} · Hoja ${hojas.length+1}</div></div>`);
+ $("#app").innerHTML=`<div class="bar"><div class="card"><h2>🖨 Documentos de ${esc(EMP.nombre)}</h2>
+  <p class="sm mu">Son los ${total} documentos de tu empresa para octubre de 2026 (empresa y cifras ficticias), 3 por hoja carta. Imprímelos o guárdalos como PDF: en la ventana de impresión elige <b>Guardar como PDF</b>. Con ellos a la mano digitas el mes en el simulador.</p>
+  <div class="toolbar"><button onclick="window.print()">🖨 Imprimir o guardar PDF</button><button class="gr" onclick="history.length>1?history.back():location.href='index.html'">← Volver</button></div></div></div>${hojas.join("")}`;
+})();
+</script>
+</body>
+</html>

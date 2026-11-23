@@ -67,6 +67,7 @@ async function viewMapa(){
   <div class="sm mu">Tu avance: ${pr} de 6 estaciones</div><div class="bar"><i style="width:${pr/6*100}%"></i></div>
  </div>
  <h3>Tu ruta</h3><div class="map">${cards}</div>
+ <div class="c"><button class="gr" onclick="window.open('documentos.html','_blank')">🖨 Imprimir los documentos de mi empresa</button></div>
  <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
  $("#out").onclick=ME.via?(()=>{sesionSet({rol:"doc"});ME={rol:"doc"};viewDocente();}):viewLogin;
  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>abrirEstacion(+b.dataset.go));
