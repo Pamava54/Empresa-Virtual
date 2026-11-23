@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 4 · Inventarios y compras · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.mv td,.mv th{padding:5px 6px;font-size:13px}
+.ok{border-color:#86efac!important;background:#f0fdf4!important}.bad{border-color:#fca5a5!important;background:#fff1f1!important}
+.kd input{width:100%;min-width:92px;text-align:right}
+.kd td.ro{background:#f5f8fc;text-align:right;white-space:nowrap}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.g3 label{font-size:12px;color:#5b6b7f;display:block;margin-bottom:2px}.g3 input{width:100%;text-align:right}
+@media(max-width:640px){.g3{grid-template-columns:1fr}}
+.cj2 .r{display:grid;grid-template-columns:1fr 170px;gap:8px;align-items:center;margin-top:8px}.cj2 .r input,.cj2 .r select{width:100%;text-align:right}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 4 · INVENTARIOS Y COMPRAS (KARDEX por promedio ponderado)
+   Facturas de compra y de venta del mes → kardex → resultados → evaluación A/B
+   ===================================================================== */
+let SES=null,EMP=null,D=null,M=null,K=null,T=null,TAB="guia",FB={},EV=null;
+const NE=4;
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ if(D.estaciones[NE].estado==="bloqueada"&&!esDoc()){location.href="index.html";return;}
+ M=generarMes(EMP.n);K=kardex(EMP.n);
+ T=D.trabajo.e4=D.trabajo.e4||{};
+ T.com=T.com||{};T.com.v=T.com.v||{};T.kar=T.kar||{};T.kar.r=T.kar.r||{};T.res=T.res||{};T.res.v=T.res.v||{};
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+function listos(){return(T.com.ok?1:0)+(T.kar.ok?1:0)+(T.res.ok?1:0);}
+function completo(){return listos()===3;}
+function verOk(o){return!o.ok&&!o.seen&&((o.tries||0)>=2||esDoc());}
+function H(k){return M.hechos.find(h=>h.k===k);}
+const COMPRAS=["compraCred1","compraCont","compraCred2"];
+function docHtml(d){
+ return`<div class="doc"><div class="dh"><b>${esc(d.tit)}</b><span>No. ${esc(d.num)} · ${esc(d.fecha)}</span></div>
+ <div class="dp">${d.partes.map(p=>`<div><span class="mu">${esc(p[0])}:</span> <b>${esc(p[1])}</b></div>`).join("")}</div>
+ ${d.filas?`<table><thead><tr><th>Descripción</th><th class="n">Cant.</th><th class="n">Vr. unitario</th><th class="n">Vr. total</th></tr></thead><tbody>${d.filas.map(f=>`<tr><td>${esc(f[0])}</td><td class="n">${f[1]}</td><td class="n">${fmt(f[2])}</td><td class="n">${fmt(f[3])}</td></tr>`).join("")}</tbody></table>`:""}
+ <div class="tt">${d.tot.map((t,i)=>`<div class="${i===d.tot.length-1?"t":""}"><span>${esc(t[0])}</span><span>${esc(t[1])}</span></div>`).join("")}</div></div>`;
+}
+
+function render(){
+ const nl=listos();
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. Verás siempre el botón “Ver solución”.</div>`:""}
+ <div class="card"><h2>📦 Estación 4 · Inventarios y compras</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · ${esc(M.prod)} · octubre de 2026</div>
+  <div style="margin-top:8px" class="sm mu">Tareas completadas: ${nl} de 3</div><div class="bar"><i style="width:${nl/3*100}%"></i></div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes repasar todo lo que quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="com"?"":"gr"}" data-t="com">🧾 1. Compras${T.com.ok?" ✅":""}</button>
+  <button class="${TAB==="kar"?"":"gr"}" data-t="kar">📊 2. Kardex${T.kar.ok?" ✅":""}</button>
+  <button class="${TAB==="res"?"":"gr"}" data-t="res">🎯 3. Resultados${T.res.ok?" ✅":""}</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="com"?vCom():TAB==="kar"?vKar():TAB==="res"?vRes():vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>¿Qué es el kardex?</h3>
+ <p>Es la tarjeta donde se controla el <b>inventario permanente</b>: cada compra suma unidades y cada venta las resta. Así sabes en todo momento cuántas unidades tienes, cuánto cuestan y cuánto costó lo que vendiste.</p>
+ <div class="sc"><table><thead><tr><th>Concepto</th><th>Cómo se calcula</th></tr></thead><tbody>
+ <tr><td><b>Costo de una compra</b></td><td>Unidades × costo unitario, <b>sin IVA</b> (el IVA de la compra es descontable y no es costo del inventario).</td></tr>
+ <tr><td><b>Costo unitario promedio</b> (promedio ponderado)</td><td>Saldo en valor ÷ saldo en unidades. Redondea al peso entero más cercano. Cambia cada vez que entra una compra a un precio distinto.</td></tr>
+ <tr><td><b>Costo de una venta (salida)</b></td><td>Unidades vendidas × costo unitario promedio del saldo en ese momento.</td></tr>
+ <tr><td><b>Saldo</b></td><td>Saldo anterior + entradas − salidas, tanto en unidades como en valor.</td></tr></tbody></table></div></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li><b>Compras</b>: lee las 3 facturas de compra de tu empresa y anota unidades, costo unitario y costo del inventario.</li>
+ <li><b>Kardex</b>: recorre el mes en orden de fecha (compras y ventas) y calcula en cada línea el saldo en unidades, el costo unitario promedio y el saldo en valor.</li>
+ <li><b>Resultados</b>: con tu kardex saca el costo de la mercancía vendida, el inventario final y la utilidad bruta, y compáralos con tus libros.</li>
+ <li>Con todo en verde se abre la <b>Evaluación</b> (5 preguntas sobre tu empresa). Con <b>${CFG.notaMinima.toFixed(1)} o más</b> pasas a la estación 5.</li></ol>
+ <p class="sm mu">Este kardex produce el mismo costo de ventas que registraste en el hecho 19 de la estación 1. Si fallas dos veces en una tarea puedes ver la solución, y luego corriges lo tuyo.</p>
+ <div class="c"><button data-t2="com">Empezar con las compras →</button></div></div>`;
+}
+
+/* ---------------- 1. COMPRAS ---------------- */
+function vCom(){
+ const o=T.com,fb=FB.com,dis=o.ok?"disabled":"";
+ const cards=COMPRAS.map((k,i)=>{const h=H(k),l=K.lineas.find(x=>x.k===k),v=o.v[k]||(o.v[k]={});const f=fb&&fb[k];
+  const cl=n=>f?(f[n]?"ok":"bad"):"";
+  return`<div class="hc"><h3><span>Compra ${i+1} · ${esc(h.doc.fecha)}</span><span class="pill">${esc(h.vals.prov)}</span></h3>${docHtml(h.doc)}
+  <div class="g3"><div><label>Unidades compradas</label><input inputmode="numeric" data-com="${k}" data-f="q" value="${esc(v.q||"")}" class="${cl("q")}" ${dis}></div>
+  <div><label>Costo unitario (sin IVA)</label><input inputmode="numeric" data-com="${k}" data-f="u" value="${esc(v.u||"")}" class="${cl("u")}" ${dis}></div>
+  <div><label>Costo del inventario (sin IVA)</label><input inputmode="numeric" data-com="${k}" data-f="v" value="${esc(v.v||"")}" class="${cl("v")}" ${dis}></div></div></div>`;}).join("");
+ return`<div class="note">Lee cada factura de compra. El inventario se registra por el valor <b>sin IVA</b>.</div>${cards}
+ <div class="card">${o.ok?`<div class="note sm">✅ Correcto. Entraron <b>${K.uCompradas}</b> unidades al inventario por <b>${fmt(K.compras)}</b> en total.</div><div class="c"><button data-t2="kar">Ir al kardex →</button></div>`:`<div class="toolbar"><button data-chkcom="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seecom="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> usa la columna “Cant.” y “Vr. unitario” de la factura, sin sumar el IVA.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b><table style="margin-top:4px">${COMPRAS.map(k=>{const l=K.lineas.find(x=>x.k===k);return`<tr><td>${esc(H(k).doc.num)}</td><td class="n" style="text-align:right">${l.q} u</td><td class="n" style="text-align:right">${fmt(l.cu)}</td><td class="n" style="text-align:right">${fmt(l.cv)}</td></tr>`}).join("")}</table>Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- 2. KARDEX ---------------- */
+function vKar(){
+ if(!T.com.ok&&!esDoc())return`<div class="card"><h3>🔒 Primero registra las compras</h3><p class="mu">Termina la tarea “1. Compras”.</p></div>`;
+ const o=T.kar,fb=FB.kar,dis=o.ok?"disabled":"";
+ const inp=(k,f,v,cl)=>`<input inputmode="numeric" data-kar="${k}" data-f="${f}" value="${esc(v||"")}" class="${cl}" ${dis}>`;
+ const rows=K.lineas.map(l=>{const r=o.r[l.k]||(o.r[l.k]={});const f=fb&&fb[l.k];const cl=n=>f?(f[n]?"ok":"bad"):"";
+  const V=l.tipo==="V";
+  return`<tr><td>${esc(l.fecha.slice(0,2))} oct</td><td>${esc(l.doc)}<br><span class="mu sm">${esc(l.det)}</span></td>
+  <td class="ro">${V?"Salida":"Entrada"} ${l.q}</td>
+  <td>${V?inp(l.k,"cu",r.cu,cl("cu")):`<div class="ro" style="padding:6px">${fmt(l.cu)}</div>`}</td>
+  <td>${V?inp(l.k,"cv",r.cv,cl("cv")):`<div class="ro" style="padding:6px">${fmt(l.cv)}</div>`}</td>
+  <td>${inp(l.k,"sq",r.sq,cl("sq"))}</td><td>${inp(l.k,"su",r.su,cl("su"))}</td><td>${inp(l.k,"sv",r.sv,cl("sv"))}</td></tr>`;}).join("");
+ return`<div class="card"><h3>📊 Kardex · ${esc(M.prod)} · promedio ponderado</h3>
+ <p class="sm mu">Las columnas en gris ya vienen dadas (cantidades de las facturas de compra y de venta). Completa las demás, línea por línea y en orden de fecha. Recuerda: costo unitario promedio = saldo en valor ÷ saldo en unidades, redondeado al peso.</p>
+ <div class="sc kd"><table class="mv"><thead><tr><th>Fecha</th><th>Documento</th><th>Movimiento (unid.)</th><th>Costo unitario movimiento</th><th>Costo total movimiento</th><th>Saldo unidades</th><th>Costo unit. promedio</th><th>Saldo valor</th></tr></thead><tbody>${rows}</tbody></table></div>
+ ${o.ok?`<div class="note sm" style="margin-top:10px">✅ ¡Kardex correcto! Terminaste el mes con <b>${K.sq}</b> unidades por <b>${fmt(K.sv)}</b>.</div><div class="c"><button data-t2="res">Ir a resultados →</button></div>`:`<div class="toolbar"><button data-chkkar="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seekar="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> en una venta, el costo unitario es el promedio del saldo anterior; en una compra, el nuevo promedio es el saldo en valor dividido entre el saldo en unidades.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b><div class="sc"><table class="mv"><thead><tr><th>Doc.</th><th style="text-align:right">Costo unit. mov.</th><th style="text-align:right">Costo total mov.</th><th style="text-align:right">Saldo unid.</th><th style="text-align:right">Costo prom.</th><th style="text-align:right">Saldo valor</th></tr></thead><tbody>${K.lineas.map(l=>`<tr><td>${esc(l.doc)}</td><td class="n" style="text-align:right">${fmt(l.cu)}</td><td class="n" style="text-align:right">${fmt(l.cv)}</td><td class="n" style="text-align:right">${l.sq}</td><td class="n" style="text-align:right">${fmt(l.su)}</td><td class="n" style="text-align:right">${fmt(l.sv)}</td></tr>`).join("")}</tbody></table></div>Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- 3. RESULTADOS ---------------- */
+const RF=[["uv","Unidades vendidas en el mes",()=>K.uVendidas],["sq","Unidades en el inventario final",()=>K.sq],["cv","Costo de la mercancía vendida",()=>K.costo],["sv","Inventario final en valor",()=>K.sv],["ub","Utilidad bruta (ventas − costo de ventas)",()=>K.ventasBase-K.costo]];
+function vRes(){
+ if(!T.kar.ok&&!esDoc())return`<div class="card"><h3>🔒 Primero termina el kardex</h3><p class="mu">Completa la tarea “2. Kardex”.</p></div>`;
+ const o=T.res,fb=FB.res,dis=o.ok?"disabled":"";
+ const rows=RF.map(f=>`<div class="r"><span>${f[1]}</span><input inputmode="numeric" data-res="${f[0]}" value="${esc(o.v[f[0]]||"")}" class="${fb?(fb[f[0]]?"ok":"bad"):""}" ${dis}></div>`).join("");
+ return`<div class="card cj2"><h3>🎯 Resultados del mes</h3>
+ <p class="sm mu">Ingresos por ventas del mes (cuenta 413595 de tu libro mayor): <b>${fmt(K.ventasBase)}</b>. Saldo de Inventarios (cuenta 143505 de tu libro mayor): <b>${fmt(K.sv)}</b>.</p>
+ ${rows}
+ <div class="r"><span>¿Tu inventario final del kardex coincide con la cuenta 143505 del mayor?</span><select data-res="coin" class="${fb?(fb.coin?"ok":"bad"):""}" ${dis}><option value="">—</option><option value="s" ${o.v.coin==="s"?"selected":""}>Sí coincide</option><option value="n" ${o.v.coin==="n"?"selected":""}>No coincide</option></select></div>
+ ${o.ok?`<div class="note sm" style="margin-top:12px">✅ ¡Correcto! El kardex y la contabilidad dicen lo mismo: el costo de ventas de ${fmt(K.costo)} es el que registraste en el hecho 19.</div>${completo()?`<div class="c"><button data-t2="eval">Ir a la evaluación →</button></div>`:""}`:`<div class="toolbar"><button data-chkres="1">✔ Revisar</button>${verOk(o)?`<button class="gr" data-seeres="1">👁 Ver solución</button>`:""}</div>`}
+ ${fb&&!o.ok?`<div class="note r sm">Hay valores incorrectos (en rojo). <b>Pista:</b> las unidades vendidas son la suma de las salidas; el costo de ventas, la suma del costo total de las salidas; el inventario final es el último saldo del kardex.</div>`:""}
+ ${o.seen&&!o.ok?`<div class="note sm"><b>Solución:</b><table style="margin-top:4px">${RF.map(f=>`<tr><td>${f[1]}</td><td class="n" style="text-align:right">${f[0]==="uv"||f[0]==="sq"?f[2]():fmt(f[2]())}</td></tr>`).join("")}<tr><td>¿Coincide con el mayor?</td><td style="text-align:right">Sí</td></tr></table>Corrige y pulsa Revisar.</div>`:""}</div>`;
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds,raw){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let q=1;const st=raw?1:1000;while(set.length<4){const x=ok+q*st;if(!set.includes(x))set.push(x);q++;}return set.slice(0,4).map(x=>({t:raw?String(x):fmt(x),ok:x===ok}));}
+function construir(v,seed){
+ const Q=[],L=K.lineas,i2=Math.round((L[0].cu+L[1].cu)/2);
+ if(v==="A"){
+  Q.push({t:"¿Cuántas unidades quedaron en tu inventario al terminar octubre?",o:numOpts(K.sq,[K.uCompradas,K.uVendidas,K.sq+K.uVendidas-K.uCompradas+5],true),e:"Compraste "+K.uCompradas+" unidades, vendiste "+K.uVendidas+" y quedaron "+K.sq+"."});
+  Q.push({t:"Verdadero o falso: en el promedio ponderado, el costo unitario del saldo cambia cuando entra una compra a un precio distinto.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: al mezclarse unidades de distinto costo, se recalcula el promedio."});
+  Q.push({t:"Después de la segunda compra (factura "+H("compraCont").doc.num+"), ¿cuál es el costo unitario promedio del saldo?",o:numOpts(L[1].su,[L[0].cu,L[1].cu,i2],true),e:"Saldo en valor "+fmt(L[1].sv)+" ÷ saldo en unidades "+L[1].sq+" = "+fmt(L[1].su)+" (no es el promedio simple de los dos precios)."});
+  Q.push({t:"¿Cuál es el costo de la mercancía vendida en octubre, según tu kardex?",o:numOpts(K.costo,[K.ventasBase,K.sv,K.compras]),e:"Es la suma de los costos de las 4 salidas: "+fmt(K.costo)+"."});
+  Q.push({t:"El IVA que pagaste en las compras de mercancía, ¿hace parte del costo del inventario?",o:[
+   {t:"No: es IVA descontable y el inventario se valora sin IVA.",ok:true},{t:"Sí: se suma al costo unitario.",ok:false},{t:"Sí, pero solo en las compras de contado.",ok:false},{t:"No: se registra como gasto de arriendo.",ok:false}],e:"El inventario se registra por el valor sin IVA; el IVA va a IVA descontable."});
+ }else{
+  const last=L[L.length-1];
+  Q.push({t:"¿Cuántas unidades vendiste en total durante octubre?",o:numOpts(K.uVendidas,[K.uCompradas,K.sq,K.uVendidas+K.sq],true),e:"Es la suma de las unidades de las 4 ventas: "+K.uVendidas+"."});
+  Q.push({t:"Verdadero o falso: el valor del inventario final del kardex debe coincidir con el saldo de la cuenta 143505 del libro mayor.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: kardex y contabilidad deben decir lo mismo."});
+  Q.push({t:"En la última venta ("+last.doc+"), ¿con qué costo unitario salieron las mercancías?",o:numOpts(last.cu,[L[0].cu,L[5].cu,last.su+1500],true),e:"Salen al costo promedio del saldo en ese momento: "+fmt(last.cu)+"."});
+  Q.push({t:"¿Cuál es el valor de tu inventario final según el kardex?",o:numOpts(K.sv,[K.compras,K.costo,K.sv+K.costo]),e:"Compras "+fmt(K.compras)+" − costo de ventas "+fmt(K.costo)+" = "+fmt(K.sv)+"."});
+  Q.push({t:"¿Cuál fue la utilidad bruta de octubre (ventas sin IVA − costo de ventas)?",o:numOpts(K.ventasBase-K.costo,[K.ventasBase,K.costo,K.ventasBase+K.costo]),e:"Ventas "+fmt(K.ventasBase)+" − costo "+fmt(K.costo)+" = "+fmt(K.ventasBase-K.costo)+"."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(!completo()&&!esDoc())return`<div class="card"><h3>🔒 La evaluación se abre al completar las tareas</h3><p class="mu">Te faltan ${3-listos()}: compras, kardex y resultados.</p></div>`;
+ if(!EV){const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";EV={v,qs:construir(v,hashStr("ev4"+EMP.n+v+n)),ans:{},fin:false};}
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){const nota=EV.nota,pasa=nota>=CFG.notaMinima;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎉 ¡Aprobaste la estación 4!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Se abrió la estación 5 · Estados financieros.":"Repasa tu kardex y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-t2="kar">Revisar mi kardex</button></div></div>`;}
+ return`<div class="card"><h3>📝 Evaluación · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre el inventario de tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>${EV.fin?res:""}${qs}${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-com]").forEach(el=>el.oninput=()=>{const v=T.com.v[el.dataset.com]||(T.com.v[el.dataset.com]={});v[el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-kar]").forEach(el=>el.oninput=()=>{const r=T.kar.r[el.dataset.kar]||(T.kar.r[el.dataset.kar]={});r[el.dataset.f]=el.value;el.classList.remove("ok","bad");guardar();});
+ document.querySelectorAll("[data-res]").forEach(el=>{const ch=()=>{T.res.v[el.dataset.res]=el.value;el.classList.remove("ok","bad");guardar();};el.oninput=ch;el.onchange=ch;});
+ document.querySelectorAll("[data-chkcom]").forEach(b=>b.onclick=async()=>{
+  const r={};let todo=true;COMPRAS.forEach(k=>{const l=K.lineas.find(x=>x.k===k),v=T.com.v[k]||{};
+   r[k]={q:parseM(v.q)===l.q,u:parseM(v.u)===l.cu,v:parseM(v.v)===l.cv};if(!r[k].q||!r[k].u||!r[k].v)todo=false;});
+  FB.com=r;if(todo)T.com.ok=1;else T.com.tries=(T.com.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seecom]").forEach(b=>b.onclick=async()=>{T.com.seen=1;await guardar();keep(render);});
+ document.querySelectorAll("[data-chkkar]").forEach(b=>b.onclick=async()=>{
+  const r={};let todo=true;K.lineas.forEach(l=>{const v=T.kar.r[l.k]||{};const f={sq:parseM(v.sq)===l.sq,su:parseM(v.su)===l.su,sv:parseM(v.sv)===l.sv};
+   if(l.tipo==="V"){f.cu=parseM(v.cu)===l.cu;f.cv=parseM(v.cv)===l.cv;}
+   r[l.k]=f;Object.values(f).forEach(x=>{if(!x)todo=false;});});
+  FB.kar=r;if(todo)T.kar.ok=1;else T.kar.tries=(T.kar.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seekar]").forEach(b=>b.onclick=async()=>{T.kar.seen=1;await guardar();keep(render);});
+ document.querySelectorAll("[data-chkres]").forEach(b=>b.onclick=async()=>{
+  const r={};let todo=true;RF.forEach(f=>{r[f[0]]=parseM(T.res.v[f[0]])===f[2]();if(!r[f[0]])todo=false;});
+  r.coin=T.res.v.coin==="s";if(!r.coin)todo=false;
+  FB.res=r;if(todo)T.res.ok=1;else T.res.tries=(T.res.tries||0)+1;await guardar();keep(render);});
+ document.querySelectorAll("[data-seeres]").forEach(b=>b.onclick=async()=>{T.res.seen=1;await guardar();keep(render);});
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);};
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>

@@ -60,10 +60,20 @@ function generarMes(n){
  const q3=ri(10,50),u3=rr(8000,65000,50),c3=q3*u3;
  const Pc=c1+c2+c3;
  const S=Math.round(Pc*0.95/1000)*1000;
- const s1=Math.round(S*0.30/100)*100,s2=Math.round(S*0.22/100)*100,s3=Math.round(S*0.20/100)*100,s4=Math.round(S*0.28/100)*100;
+ // ---- ventas en unidades (para el kardex): precio de venta por unidad y cantidades ----
+ const QT=q1+q2+q3,avg0=Pc/QT;
+ const pv=Math.max(50,Math.round(avg0*(1.25+R()*0.2)/50)*50);
+ const Qs=Math.max(8,Math.round(S/pv));
+ const cap=Math.floor(0.85*(q1+q2));
+ const eu0=Math.min(Math.round(Qs*0.72),cap);
+ const qs1=Math.max(2,Math.round(eu0*30/72)),qs2=Math.max(2,Math.round(eu0*22/72)),qs3=Math.max(2,eu0-qs1-qs2);
+ const eu=qs1+qs2+qs3;
+ const qs4=Math.max(2,Math.min(Math.round(eu*28/72),QT-eu-Math.max(2,Math.floor(0.1*QT))));
+ const s1=qs1*pv,s2=qs2*pv,s3=qs3*pv,s4=qs4*pv;
  const tot=b=>b+iva(b);
  const sTotal=s1+s2+s3+s4;
- const costo=Math.round(sTotal*0.6/1000)*1000;
+ const KD=calcKardex({q1,u1,q2,u2,q3,u3,qs1,qs2,qs3,qs4});
+ const costo=KD.costo;
  const eq=rr(1200000,3500000,10000);
  const arr=rr(500000,1800000,10000),ene=rr(120000,450000,1000),net=rr(90000,260000,1000),nom=rr(900000,2400000,10000),util=rr(30000,90000,1000);
  const pagoProv=Math.round(tot(c1)*0.6/1000)*1000;
@@ -103,14 +113,14 @@ function generarMes(n){
 
  add({k:"ventaEf",dia:5,t:"Venta de contado en efectivo",
   doc:D("FACTURA DE VENTA","FV-"+(fv++),5,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente","Ventas de mostrador"),P("Forma de pago","Contado · efectivo")],
-   filaBase("Venta de "+prod,1,s2),[["Subtotal",fmt(s2)],["IVA 19%",fmt(iva(s2))],["TOTAL RECIBIDO",fmt(tot(s2))]]),
+   filaBase("Venta de "+prod,qs2,pv),[["Subtotal",fmt(s2)],["IVA 19%",fmt(iva(s2))],["TOTAL RECIBIDO",fmt(tot(s2))]]),
   asiento:[{c:"110505",s:"D",v:tot(s2)},{c:"413595",s:"H",v:s2},{c:"240801",s:"H",v:iva(s2)}],
   pista:"Entra efectivo (Debe en caja por el total). La venta es un ingreso y el IVA cobrado es IVA generado, ambos en el Haber.",
   vals:{base:s2,iva:iva(s2),total:tot(s2)}});
 
  add({k:"ventaCred1",dia:6,t:"Venta a crédito a "+CL[0],
   doc:D("FACTURA DE VENTA","FV-"+(fv++),6,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente",CL[0]),P("Forma de pago","Crédito a 30 días")],
-   filaBase("Venta de "+prod,1,s1),[["Subtotal",fmt(s1)],["IVA 19%",fmt(iva(s1))],["TOTAL A COBRAR",fmt(tot(s1))]]),
+   filaBase("Venta de "+prod,qs1,pv),[["Subtotal",fmt(s1)],["IVA 19%",fmt(iva(s1))],["TOTAL A COBRAR",fmt(tot(s1))]]),
   asiento:[{c:"130505",s:"D",v:tot(s1)},{c:"413595",s:"H",v:s1},{c:"240801",s:"H",v:iva(s1)}],
   pista:"Como no se cobra todavía, no entra plata: el cliente nos debe (Clientes, en el Debe por el total).",
   vals:{cli:CL[0],base:s1,iva:iva(s1),total:tot(s1)}});
@@ -150,7 +160,7 @@ function generarMes(n){
 
  add({k:"ventaBco",dia:16,t:"Venta pagada con datáfono (entra al banco)",
   doc:D("FACTURA DE VENTA","FV-"+(fv++),16,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente","Ventas de mostrador"),P("Forma de pago","Tarjeta · el valor se abona en el banco")],
-   filaBase("Venta de "+prod,1,s3),[["Subtotal",fmt(s3)],["IVA 19%",fmt(iva(s3))],["TOTAL ABONADO AL BANCO",fmt(tot(s3))]]),
+   filaBase("Venta de "+prod,qs3,pv),[["Subtotal",fmt(s3)],["IVA 19%",fmt(iva(s3))],["TOTAL ABONADO AL BANCO",fmt(tot(s3))]]),
   asiento:[{c:"111005",s:"D",v:tot(s3)},{c:"413595",s:"H",v:s3},{c:"240801",s:"H",v:iva(s3)}],
   pista:"Igual que la venta de contado, pero el dinero entra al banco y no a la caja.",
   vals:{base:s3,iva:iva(s3),total:tot(s3)}});
@@ -164,7 +174,7 @@ function generarMes(n){
 
  add({k:"ventaCred2",dia:20,t:"Venta a crédito a "+CL[1],
   doc:D("FACTURA DE VENTA","FV-"+(fv++),20,[P("Vendedor",emp.nombre),P("NIT",miNit),P("Cliente",CL[1]),P("Forma de pago","Crédito a 30 días")],
-   filaBase("Venta de "+prod,1,s4),[["Subtotal",fmt(s4)],["IVA 19%",fmt(iva(s4))],["TOTAL A COBRAR",fmt(tot(s4))]]),
+   filaBase("Venta de "+prod,qs4,pv),[["Subtotal",fmt(s4)],["IVA 19%",fmt(iva(s4))],["TOTAL A COBRAR",fmt(tot(s4))]]),
   asiento:[{c:"130505",s:"D",v:tot(s4)},{c:"413595",s:"H",v:s4},{c:"240801",s:"H",v:iva(s4)}],
   pista:"El cliente queda debiendo el total (Clientes al Debe). Ingreso e IVA generado al Haber.",
   vals:{cli:CL[1],base:s4,iva:iva(s4),total:tot(s4)}});
@@ -191,11 +201,11 @@ function generarMes(n){
   pista:"Entra efectivo a la caja (Debe) y la deuda del cliente baja (Clientes al Haber)."});
 
  add({k:"costo",dia:30,t:"Costo de las ventas del mes",
-  doc:D("REPORTE DE INVENTARIO PERMANENTE (KARDEX)","KD-OCT",30,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Producto","Mercancía: "+prod),P("Método","Costo de lo vendido en el mes")],null,[["COSTO DE LA MERCANCÍA VENDIDA",fmt(costo)]],"Al vender, la mercancía sale del inventario y se reconoce su costo."),
+  doc:D("REPORTE DE INVENTARIO PERMANENTE (KARDEX)","KD-OCT",30,[P("Empresa",emp.nombre),P("Periodo","Octubre 2026"),P("Producto","Mercancía: "+prod),P("Método","Promedio ponderado")],null,[["COSTO DE LA MERCANCÍA VENDIDA",fmt(costo)]],"Al vender, la mercancía sale del inventario y se reconoce su costo."),
   asiento:[{c:"613595",s:"D",v:costo},{c:"143505",s:"H",v:costo}],
   pista:"El costo de ventas es un gasto (Debe) y la mercancía vendida sale del inventario (Haber)."});
 
- return{n,emp,hechos:H,resumen:{capital,Ac,Ab,Pc,sTotal,costo,ivaGen:iva(s1)+iva(s2)+iva(s3)+iva(s4)},prod,PV,CL};
+ return{n,emp,hechos:H,resumen:{capital,Ac,Ab,Pc,sTotal,costo,ivaGen:iva(s1)+iva(s2)+iva(s3)+iva(s4)},prod,PV,CL,inv:{q:[q1,q2,q3],u:[u1,u2,u3],pv,qs:{ventaEf:qs2,ventaCred1:qs1,ventaBco:qs3,ventaCred2:qs4}}};
 }
 
 
@@ -250,4 +260,31 @@ function conciliar(n){
    {k:"nd",t:"Nota débito: cuota de manejo de la cuenta",valor:nd,fecha:dOct(30),asiento:[{c:"530505",s:"D",v:nd},{c:"111005",s:"H",v:nd}],pista:"El banco cobró un gasto: los gastos bancarios van al Debe y como sale plata del banco, Bancos va al Haber."},
    {k:"nc",t:"Nota crédito: intereses ganados",valor:nc,fecha:dOct(30),asiento:[{c:"111005",s:"D",v:nc},{c:"421005",s:"H",v:nc}],pista:"El banco abonó intereses: entra plata al banco (Debe) y es un ingreso financiero (Haber)."}
   ]};
+}
+
+
+/* =====================================================================
+   KARDEX · inventario permanente por promedio ponderado (estación 4)
+   Costo unitario de salida = saldo en valor / saldo en unidades, redondeado al peso.
+   ===================================================================== */
+function calcKardex(p){
+ const seq=[["compraCred1","C",p.q1,p.u1,2],["compraCont","C",p.q2,p.u2,3],["ventaEf","V",p.qs2,0,5],["ventaCred1","V",p.qs1,0,6],["ventaBco","V",p.qs3,0,16],["compraCred2","C",p.q3,p.u3,18],["ventaCred2","V",p.qs4,0,20]];
+ let sq=0,sv=0,costo=0;const L=[];
+ seq.forEach(x=>{
+  const l={k:x[0],tipo:x[1],dia:x[4],q:x[2]};
+  if(x[1]==="C"){l.cu=x[3];l.cv=x[2]*x[3];sq+=x[2];sv+=l.cv;}
+  else{l.cu=Math.round(sv/sq);l.cv=x[2]*l.cu;sq-=x[2];sv-=l.cv;costo+=l.cv;}
+  l.sq=sq;l.sv=sv;l.su=sq>0?Math.round(sv/sq):0;L.push(l);
+ });
+ return{lineas:L,costo,sq,sv};
+}
+function kardex(n){
+ const M=generarMes(n),I=M.inv;
+ const K=calcKardex({q1:I.q[0],u1:I.u[0],q2:I.q[1],u2:I.u[1],q3:I.q[2],u3:I.u[2],qs1:I.qs.ventaCred1,qs2:I.qs.ventaEf,qs3:I.qs.ventaBco,qs4:I.qs.ventaCred2});
+ K.lineas.forEach(l=>{const h=M.hechos.find(z=>z.k===l.k);l.hecho=h.id;l.doc=h.doc.num;l.fecha=h.doc.fecha;l.det=l.tipo==="C"?"Compra · "+(h.vals.prov||""):"Venta · "+(l.k==="ventaEf"?"mostrador (efectivo)":l.k==="ventaBco"?"mostrador (datáfono)":h.vals.cli);});
+ K.empresa=M.emp.nombre;K.prod=M.prod;K.pv=I.pv;K.ventasBase=M.hechos.filter(h=>/^venta/.test(h.k)).reduce((a,h)=>a+h.vals.base,0);
+ K.compras=K.lineas.filter(l=>l.tipo==="C").reduce((a,l)=>a+l.cv,0);
+ K.uVendidas=K.lineas.filter(l=>l.tipo==="V").reduce((a,l)=>a+l.q,0);
+ K.uCompradas=K.lineas.filter(l=>l.tipo==="C").reduce((a,l)=>a+l.q,0);
+ return K;
 }

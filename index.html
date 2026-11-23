@@ -76,6 +76,7 @@ function abrirEstacion(n){
  if(n===1){location.href="est1.html";return;}
  if(n===2){location.href="est2.html";return;}
  if(n===3){location.href="est3.html";return;}
+ if(n===4){location.href="est4.html";return;}
  const d=document.createElement("div");d.className="modal";
  d.innerHTML=`<div><h2>${s.ic} Estación ${n} · ${s.t}</h2><div class="note w">Esta estación se está construyendo y se abrirá en una próxima entrega. Por ahora, tu profesor puede probar el avance con las evaluaciones.</div><div class="c"><button id="x">Entendido</button></div></div>`;
  document.body.appendChild(d);d.querySelector("#x").onclick=()=>d.remove();
