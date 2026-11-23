@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estación 6 · Simulador contable PAMAVA · Empresa Virtual PAMAVA</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.mv td,.mv th{padding:6px 8px;font-size:13px;vertical-align:top}
+.ok{color:#15803d;font-weight:700}.no{color:#b91c1c;font-weight:700}
+.big2{font-size:16px;padding:12px 22px}
+</style>
+</head>
+<body>
+<div class="wm">PAMAVA soluciones</div>
+<div id="app"></div>
+<script src="core.js"></script>
+<script src="mes.js"></script>
+<script src="evdata.js"></script>
+<script>
+/* =====================================================================
+   ESTACIÓN 6 · SIMULADOR CONTABLE PAMAVA
+   El estudiante registra el mes de su empresa en el simulador (tipo software contable);
+   aquí tiene su misión, revisa que todo coincida y presenta la evaluación final A/B.
+   ===================================================================== */
+let SES=null,EMP=null,D=null,M=null,E=null,K=null,T=null,TAB="guia",EV=null,RES=null,RESMSG="";
+const NE=6;
+const DB="https://pamava-ruleta-default-rtdb.firebaseio.com";
+
+(async()=>{
+ await Store.init();
+ SES=sesionGet();
+ if(!SES||!SES.n){location.href="index.html";return;}
+ EMP=EMPRESAS[SES.n-1];
+ D=await cargar(EMP.n);
+ if(D.estaciones[NE].estado==="bloqueada"&&!esDoc()){location.href="index.html";return;}
+ SES.nombre=D.alumno||SES.nombre||"";sesionSet(SES);
+ M=generarMes(EMP.n);E=estados(EMP.n);K=kardex(EMP.n);
+ T=D.trabajo.e6=D.trabajo.e6||{};T.rev=T.rev||{};
+ render();
+})();
+
+function guardar(){return Store.set(EMP.n,D);}
+function esDoc(){return SES&&SES.rol==="doc";}
+function aprobada(){return D.estaciones[NE].estado==="aprobada";}
+function completo(){return !!T.rev.ok;}
+const fm=v=>v<0?"−"+fmt(-v):fmt(v);
+
+/* ----- resumen que deja el simulador ----- */
+async function leerResumen(){
+ let r=null;
+ try{const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);const x=await fetch(DB+"/ev_sim/"+EMP.n+"/res.json",{signal:c.signal});clearTimeout(t);if(x.ok)r=await x.json();}catch(e){}
+ let loc=null;try{loc=JSON.parse(localStorage.getItem("pamava_ev_sim_res_"+EMP.n));}catch(e){}
+ if(loc&&(!r||(loc.t||0)>(r.t||0)))r=loc;
+ return r;
+}
+/* ----- puntos de control: lo que debe dar el simulador ----- */
+function puntos(){
+ const er=E.er,f=E.esf;
+ return[
+  ["Capital de los socios","capital",f.cap,0],["Compras de mercancía (sin IVA)","compras",K.compras,0],["Ventas (sin IVA)","ventas",er.ing,0],
+  ["Costo de ventas","costo",er.cos,500],["Inventario final","inventario",f.inv,500],["Clientes por cobrar","clientes",f.cli,0],["Proveedores por pagar","proveedores",f.prov,0],
+  ["Saldo de Bancos","bancos",f.banco,0],["Saldo de Caja","caja",f.caja,0],["Equipos de cómputo","equipos",f.eq,0],
+  ["Sueldos","sueldos",er.suel,0],["Arrendamientos","arriendo",er.arr,0],["Energía eléctrica","energia",er.ene,0],["Teléfono e internet","internet",er.tel,0],["Papelería","papeleria",er.uti,0],
+  ["Gastos bancarios (cuota de manejo)","gastosFin",er.gfin,0],["Intereses ganados","ingresosFin",er.ifin,0],["IVA generado","ivaGen",f.ivag,0],["IVA descontable","ivaDesc",f.ivad,0]];
+}
+
+function render(){
+ $("#app").innerHTML=`
+ <div class="top"><div><span class="brand">PAMAVA soluciones</span><div class="sm mu">${esc(D.alumno||"Docente")} · ${esc(EMP.nombre)}</div></div>
+  <button class="gr" onclick="location.href='index.html'">← Volver a la ruta</button></div>
+ ${esDoc()?`<div class="note w sm">🧑‍🏫 Modo docente: estás probando la empresa ${EMP.n}. En la evaluación verás siempre el botón de enviar sin bloqueo.</div>`:""}
+ <div class="card"><h2>💻 Estación 6 · Simulador contable PAMAVA</h2>
+  <div class="sm mu">Empresa ${EMP.n} · ${esc(EMP.nombre)} · octubre de 2026</div>
+  ${aprobada()?`<div class="note"><b>✅ Estación aprobada</b> con nota ${Number(D.estaciones[NE].nota).toFixed(1)}. Puedes seguir usando el simulador cuando quieras.</div>`:""}
+ </div>
+ <div class="toolbar" id="tabs">
+  <button class="${TAB==="guia"?"":"gr"}" data-t="guia">📘 Guía</button>
+  <button class="${TAB==="mis"?"":"gr"}" data-t="mis">🎯 Mi misión</button>
+  <button class="${TAB==="rev"?"":"gr"}" data-t="rev">✅ Revisar mi simulador${T.rev.ok?" ✅":""}</button>
+  <button class="${TAB==="eval"?"":"gr"}" data-t="eval">📝 Evaluación</button>
+ </div>
+ <div id="view"></div>
+ <div class="wmk">© ${CFG.marca} · Empresas y cifras ficticias</div>`;
+ document.querySelectorAll("#tabs [data-t]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;EV=null;render();window.scrollTo(0,0);});
+ $("#view").innerHTML=TAB==="guia"?vGuia():TAB==="mis"?vMision():TAB==="rev"?vRev():vEval();
+ bind();
+}
+
+/* ---------------- GUÍA ---------------- */
+function vGuia(){
+ return`<div class="card"><h3>Ahora lo haces como en un software contable real</h3>
+ <p>En las estaciones anteriores armaste todo paso a paso. Ahora vas a llevar <b>el mismo mes de tu empresa</b> en el <b>Simulador contable PAMAVA</b>, un programa parecido a los que usan las empresas: se registran los documentos y el programa genera solo los asientos, los libros, el inventario y los reportes.</p>
+ <div class="note"><b>Lo que ya viene listo en tu simulador:</b> los datos de tu empresa, tus <b>proveedores</b> y <b>clientes</b> (con su NIT) y tu <b>producto</b> de inventario. Tú registras los documentos del mes.</div></div>
+ <div class="card"><h3>Cómo trabajar esta estación</h3>
+ <ol><li>Entra a <b>Mi misión</b>: es la lista de los documentos de tu empresa y qué debes crear en el simulador para cada uno.</li>
+ <li>Pulsa <b>Abrir el simulador</b> y registra los documentos <b>en orden de fecha</b>. Usa la fecha del documento original (octubre de 2026). Menú <b>+ Crear</b> arriba, o los módulos del menú izquierdo.</li>
+ <li>Tu trabajo <b>se guarda solo</b> en la nube. Puedes cerrar y seguir después, incluso desde otro equipo. Para volver aquí: menú de tu nombre → <b>Volver a la ruta</b>.</li>
+ <li>En <b>Revisar mi simulador</b> comprobamos que tus cifras coincidan con lo que debe dar tu empresa.</li>
+ <li>Cuando todo coincida, presentas la <b>Evaluación final</b> (5 preguntas). Con <b>${CFG.notaMinima.toFixed(1)} o más</b> terminas la Empresa Virtual.</li></ol>
+ <div class="note sm">Consejo: crea primero las <b>compras</b> (para tener inventario) y luego las <b>ventas</b>; el simulador no te deja vender más unidades de las que tienes.</div>
+ <div class="c" style="margin-top:12px"><button class="big2" data-open="1">Abrir el simulador →</button> <button class="gr" data-t2="mis">Ver mi misión</button></div></div>`;
+}
+
+/* ---------------- MISIÓN ---------------- */
+function lineaAs(h,c){const l=h.asiento.find(x=>x.c===c);return l?l.v:0;}
+function parte(h,n){const p=(h.doc.partes||[]).find(x=>x[0]===n);return p?p[1]:"";}
+function misionHecho(h){
+ const d=h.doc,fecha=d.fecha,q=k=>h.k===k;
+ const fila=d.filas&&d.filas[0];
+ const fp=parte(h,"Forma de pago");
+ const medio=/cheque|banco|tarjeta|PSE|Transfer/i.test(fp+parte(h,"Medio de pago")+parte(h,"Medio"))?"Bancos":"Caja (efectivo)";
+ let doc="",datos="";
+ if(h.k==="aportes"){doc="Contabilidad → <b>Comprobante contable</b>";datos=`Debe Caja general (110505) ${fmt(lineaAs(h,"110505"))} · Debe Bancos (111005) ${fmt(lineaAs(h,"111005"))} · Haber Capital (310505) ${fmt(lineaAs(h,"310505"))}`;}
+ else if(h.k==="compraCred1"||h.k==="compraCred2"||h.k==="compraCont"){doc="Compras y gastos → <b>Factura de compra</b>";datos=`Proveedor <b>${esc(h.vals.prov)}</b> · ${q("compraCont")?"Contado, medio Bancos":"A crédito (30 días)"} · No. proveedor ${esc(d.num)} · Producto “Mercancía” · <b>${fila[1]}</b> unidades × <b>${fmt(fila[2])}</b>`;}
+ else if(h.k==="ventaEf"||h.k==="ventaBco"){doc="Ventas → <b>Factura de venta</b>";datos=`Cliente <b>Ventas de mostrador</b> · Contado, medio ${q("ventaBco")?"Bancos":"Caja (efectivo)"} · <b>${fila[1]}</b> unidades × <b>${fmt(fila[2])}</b>`;}
+ else if(h.k==="ventaCred1"||h.k==="ventaCred2"){doc="Ventas → <b>Factura de venta</b>";datos=`Cliente <b>${esc(h.vals.cli)}</b> · A crédito (30 días) · <b>${fila[1]}</b> unidades × <b>${fmt(fila[2])}</b>`;}
+ else if(h.k==="arriendo"||h.k==="energia"||h.k==="internet"||h.k==="utiles"){
+  const cta={arriendo:"512010",energia:"513530",internet:"513535",utiles:"519530"}[h.k];
+  const who={arriendo:"Inmobiliaria Centro Ibagué",energia:"Energía del Tolima S.A. E.S.P.",internet:"Comunicaciones del Centro S.A.",utiles:"Papelería La Esquina"}[h.k];
+  doc="Compras y gastos → <b>Documento de gasto</b>";datos=`Tercero <b>${who}</b> · Cuenta de gasto <b>${cta} ${PUC[cta]}</b> · Valor base <b>${fmt(lineaAs(h,cta))}</b> · Sin IVA · Contado, medio ${h.k==="utiles"?"Caja (efectivo)":"Bancos"}`;}
+ else if(h.k==="consig"){doc="Contabilidad → <b>Movimiento bancario</b>";datos=`Tipo <b>Consignación</b> · Cuenta corriente (111005) · Valor <b>${fmt(lineaAs(h,"111005"))}</b>`;}
+ else if(h.k==="pagoProv"){doc="Compras y gastos → <b>Comprobante de egreso</b>";datos=`Proveedor <b>${esc(parte(h,"Pagado a"))}</b> · Medio Bancos · Valor <b>${fmt(lineaAs(h,"111005"))}</b>`;}
+ else if(h.k==="equipo"){doc="Contabilidad → <b>Compra de activo fijo</b>";datos=`Proveedor <b>${esc(parte(h,"Proveedor"))}</b> · Categoría Equipo de cómputo · Valor base <b>${fmt(lineaAs(h,"152805"))}</b> · IVA 19% · A crédito · Vida útil 60 meses`;}
+ else if(h.k==="nomina"){doc="Contabilidad → <b>Comprobante contable</b>";datos=`Debe Sueldos (510506) ${fmt(lineaAs(h,"510506"))} · Haber Bancos (111005) ${fmt(lineaAs(h,"111005"))}`;}
+ else if(h.k==="cobro1"||h.k==="cobro2"){doc="Ventas → <b>Recibo de caja</b>";datos=`Cliente <b>${esc(parte(h,"Recibido de"))}</b> · Medio ${h.k==="cobro1"?"Bancos":"Caja (efectivo)"} · Valor <b>${fmt(h.vals?h.vals.valor||lineaAs(h,h.k==="cobro1"?"111005":"110505"):0)}</b>`;}
+ else if(h.k==="costo"){doc="Automático";datos=`No lo creas: el simulador calcula el costo de ventas al facturar cada venta (promedio ponderado).`;}
+ return`<tr><td>${h.id}</td><td>${esc(fecha)}</td><td>${esc(d.tit)}<br><span class="mu sm">${esc(d.num)}</span></td><td>${doc}</td><td>${datos}</td></tr>`;
+}
+function vMision(){
+ const C=conciliar(EMP.n),ev=EVDATA[EMP.n];
+ const aj=[["30 oct. 2026","Cuota de manejo de la cuenta (nota débito del banco)",`Contabilidad → <b>Movimiento bancario</b>`,`Tipo <b>Comisión bancaria</b> · Cuenta corriente (111005) · Valor <b>${fmt(C.nd)}</b>`],["30 oct. 2026","Intereses de la cuenta (nota crédito del banco)",`Contabilidad → <b>Movimiento bancario</b>`,`Tipo <b>Intereses ganados</b> · Cuenta corriente (111005) · Valor <b>${fmt(C.nc)}</b>`]];
+ return`<div class="card"><h3>🎯 Tu misión: llevar octubre en el simulador</h3>
+ <p class="sm mu">Registra estos documentos <b>en orden de fecha</b>. Son los mismos hechos de las estaciones anteriores. Al terminar, el simulador debe darte las mismas cifras que tus estados financieros.</p>
+ <div class="sc"><table class="mv"><thead><tr><th>#</th><th>Fecha</th><th>Documento original</th><th>En el simulador</th><th>Datos que debes escribir</th></tr></thead><tbody>
+ ${M.hechos.map(misionHecho).join("")}
+ ${aj.map((a,i)=>`<tr><td>+${i+1}</td><td>${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td></tr>`).join("")}</tbody></table></div>
+ <div class="note sm" style="margin-top:10px">En los documentos con producto, el simulador ya tiene tu producto “Mercancía: ${esc(ev.prod)}” con IVA 19%. El precio y la cantidad los escribes tal como salen en la factura original. Los documentos de gasto, recibos y comprobantes usan los terceros que ya están creados.</div></div>
+ <div class="card"><h3>Terceros que ya tienes creados</h3><div class="sc"><table class="mv"><thead><tr><th>Tipo</th><th>Nombre</th><th>NIT</th></tr></thead><tbody>
+ ${ev.prov.map(p=>`<tr><td>Proveedor</td><td>${esc(p.nombre)}</td><td>${esc(p.nit)}</td></tr>`).join("")}${ev.cli.map(p=>`<tr><td>Cliente</td><td>${esc(p.nombre)}</td><td>${esc(p.nit)}</td></tr>`).join("")}</tbody></table></div>
+ <div class="c" style="margin-top:12px"><button class="big2" data-open="1">Abrir el simulador →</button></div></div>`;
+}
+
+/* ---------------- REVISAR ---------------- */
+function vRev(){
+ const P=puntos();let body="";
+ if(RES){
+  const filas=P.map(p=>{const v=RES[p[1]]||0,ok=Math.abs(v-p[2])<=p[3];return{n:p[0],v,e:p[2],ok};});
+  const nok=filas.filter(x=>x.ok).length;
+  body=`<div class="sc"><table class="mv"><thead><tr><th>Concepto</th><th style="text-align:right">Tu simulador</th><th style="text-align:right">Debe dar</th><th></th></tr></thead><tbody>
+  ${filas.map(x=>`<tr><td>${esc(x.n)}</td><td class="n" style="text-align:right">${fm(x.v)}</td><td class="n" style="text-align:right">${x.ok?fm(x.e):"—"}</td><td>${x.ok?'<span class="ok">✔</span>':'<span class="no">✘</span>'}</td></tr>`).join("")}</tbody></table></div>
+  <p class="sm mu" style="margin-top:8px">Documentos registrados en tu simulador: <b>${RES.docs||0}</b> · Coinciden: <b>${nok} de ${filas.length}</b>${filas.every(x=>x.ok)?"":". Donde veas ✘ revisa los documentos relacionados (valor, fecha, medio de pago o tercero) en el simulador."}</p>`;
+ }
+ return`<div class="card"><h3>✅ Revisar mi simulador</h3>
+ <p class="sm mu">Compara las cifras de tu simulador con lo que debe dar tu empresa. Registra primero tus documentos en el simulador y luego pulsa <b>Revisar</b>. Las cifras “Debe dar” se muestran cuando coinciden.</p>
+ ${RESMSG?`<div class="note r sm">${esc(RESMSG)}</div>`:""}${body}
+ ${T.rev.ok?`<div class="note sm" style="margin-top:10px">✅ ¡Tu simulador coincide con tu empresa! Ya puedes presentar la evaluación final.</div><div class="c"><button data-t2="eval">Ir a la evaluación →</button></div>`:`<div class="toolbar"><button data-chkrev="1">🔄 Revisar mi simulador</button><button class="gr" data-open="1">Abrir el simulador</button></div>`}</div>`;
+}
+
+/* ---------------- EVALUACIÓN ---------------- */
+function shuf(arr,seed){const R=mulberry32(seed);const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function numOpts(ok,ds){const set=[ok];ds.forEach(x=>{if(x>0&&!set.includes(x))set.push(x);});let q=1;while(set.length<4){const x=ok+q*1000;if(!set.includes(x))set.push(x);q++;}return set.slice(0,4).map(x=>({t:fmt(x),ok:x===ok}));}
+function construir(v,seed){
+ const Q=[],f=E.esf,er=E.er;
+ if(v==="A"){
+  Q.push({t:"¿Cuál es el saldo de Bancos en tu simulador al terminar octubre?",o:numOpts(f.banco,[f.caja,f.efe,f.banco+er.gfin*100]),e:"Es el saldo de la cuenta de bancos después de todos tus documentos y las notas del banco: "+fmt(f.banco)+"."});
+  Q.push({t:"Para registrar el pago de una deuda con un proveedor, ¿qué documento creas en el simulador?",o:[{t:"Comprobante de egreso",ok:true},{t:"Recibo de caja",ok:false},{t:"Factura de venta",ok:false},{t:"Nota crédito de venta",ok:false}],e:"El comprobante de egreso registra los pagos que hace la empresa: baja Proveedores y sale dinero de caja o bancos."});
+  Q.push({t:"Verdadero o falso: al emitir una factura de venta de un producto con inventario, el simulador calcula solo el costo de ventas.",o:[{t:"Verdadero",ok:true},{t:"Falso",ok:false}],fixed:true,e:"Verdadero: usa el costo promedio ponderado del producto y descarga el inventario."});
+  Q.push({t:"¿Cuánto vendiste en octubre, sin IVA, según tu simulador?",o:numOpts(er.ing,[er.ing+f.ivag,er.ub,f.cli]),e:"Las ventas del mes suman "+fmt(er.ing)+" antes de IVA."});
+  Q.push({t:"Para registrar la consignación de efectivo al banco, ¿qué documento usas?",o:[{t:"Movimiento bancario (consignación)",ok:true},{t:"Factura de compra",ok:false},{t:"Documento de gasto",ok:false},{t:"Cotización",ok:false}],e:"Es un movimiento entre caja y bancos: se registra como movimiento bancario."});
+ }else{
+  Q.push({t:"¿Cuánto te deben tus clientes al terminar octubre, según tu simulador?",o:numOpts(f.cli,[er.ing,f.prov,f.cli+f.ivag]),e:"Es el saldo de Clientes nacionales: "+fmt(f.cli)+"."});
+  Q.push({t:"Un cliente te paga parte de lo que te debe. ¿Qué documento creas?",o:[{t:"Recibo de caja",ok:true},{t:"Comprobante de egreso",ok:false},{t:"Factura de compra",ok:false},{t:"Documento de gasto",ok:false}],e:"El recibo de caja registra el dinero que recibe la empresa y baja la deuda del cliente."});
+  Q.push({t:"Verdadero o falso: un recibo de caja registra una venta nueva y causa IVA generado.",o:[{t:"Verdadero",ok:false},{t:"Falso",ok:true}],fixed:true,e:"Falso: la venta se registra con la factura de venta; el recibo solo registra el cobro."});
+  Q.push({t:"¿Cuánto debes a tus proveedores al terminar octubre?",o:numOpts(f.prov,[f.cli,f.pas,f.prov-f.ivag]),e:"Es el saldo de Proveedores nacionales: "+fmt(f.prov)+"."});
+  Q.push({t:"¿Dónde consultas en el simulador el balance de prueba de tu empresa?",o:[{t:"En el módulo de Reportes",ok:true},{t:"En el módulo de Clientes",ok:false},{t:"En la factura de venta",ok:false},{t:"En el módulo de Bodegas",ok:false}],e:"Los reportes (balance de prueba, estados financieros, libros auxiliares) salen del módulo Reportes."});
+ }
+ return Q.map((q,i)=>({...q,o:q.fixed?q.o:shuf(q.o,seed+i*7)}));
+}
+function vEval(){
+ const est=D.estaciones[NE];
+ if(!completo()&&!esDoc())return`<div class="card"><h3>🔒 La evaluación se abre cuando tu simulador coincida</h3><p class="mu">Registra tus documentos en el simulador y comprueba en “Revisar mi simulador”.</p></div>`;
+ if(!EV){const n=est.intentos.filter(x=>!x.manual).length,v=(n%2===0)?"A":"B";EV={v,qs:construir(v,hashStr("ev6"+EMP.n+v+n)),ans:{},fin:false};}
+ const ya=est.estado==="aprobada"?`<div class="note sm">Ya aprobaste esta estación (${Number(est.nota).toFixed(1)}). Puedes presentar la evaluación otra vez para practicar; tu nota aprobada se conserva.</div>`:"";
+ const qs=EV.qs.map((q,i)=>{const cl=EV.fin?(EV.ans[i]!==undefined&&q.o[EV.ans[i]].ok?"okq":"badq"):"";
+  return`<div class="q ${cl}"><b>${i+1}. ${esc(q.t)}</b>${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" data-q="${i}" value="${j}" ${EV.ans[i]===j?"checked":""} ${EV.fin?"disabled":""}> ${esc(o.t)}</label>`).join("")}${EV.fin?`<div class="sm mu" style="margin-top:6px">💡 ${esc(q.e)}</div>`:""}</div>`;}).join("");
+ let res="";
+ if(EV.fin){const nota=EV.nota,pasa=nota>=CFG.notaMinima;
+  const notas=Object.values(D.estaciones).filter(x=>x.estado==="aprobada"&&x.nota!=null).map(x=>Number(x.nota));
+  const prom=notas.length?(notas.reduce((a,b)=>a+b,0)/notas.length):nota;
+  res=`<div class="card c"><div class="big">${nota.toFixed(1)} <span class="mu" style="font-size:18px">/ 5.0</span></div><h2>${pasa?"🎓 ¡Completaste la Empresa Virtual PAMAVA!":"Aún no alcanzas "+CFG.notaMinima.toFixed(1)}</h2>
+  <p class="mu">${pasa?"Llevaste un mes completo de tu empresa: desde el primer asiento hasta el software contable. Promedio de tus estaciones: <b>"+prom.toFixed(1)+"</b>.":"Repasa tu simulador y presenta la versión "+(EV.v==="A"?"B":"A")+", que trae preguntas diferentes."}</p>
+  <div class="toolbar" style="justify-content:center">${pasa?`<button onclick="location.href='index.html'">Ir a la ruta →</button>`:`<button data-retry="1">Intentar de nuevo</button>`}<button class="gr" data-open="1">Abrir el simulador</button></div></div>`;}
+ return`<div class="card"><h3>📝 Evaluación final · versión ${EV.v}</h3><p class="sm mu">5 preguntas sobre lo que hiciste en el simulador con tu empresa. Cada una vale 1.0. Para pasar necesitas ${CFG.notaMinima.toFixed(1)} o más.</p>${ya}</div>${EV.fin?res:""}${qs}${EV.fin?"":`<div class="c"><button data-send="1">Enviar respuestas</button></div>`}`;
+}
+
+/* ---------------- eventos ---------------- */
+function bind(){
+ document.querySelectorAll("[data-t2]").forEach(b=>b.onclick=()=>{TAB=b.dataset.t2;EV=null;render();window.scrollTo(0,0);});
+ document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{SES.nombre=D.alumno||SES.nombre||"";sesionSet(SES);location.href="simulador.html";});
+ document.querySelectorAll("[data-chkrev]").forEach(b=>b.onclick=async()=>{
+  toast("Revisando tu simulador…");RESMSG="";RES=await leerResumen();
+  if(!RES){RESMSG="Todavía no encontramos trabajo en tu simulador. Ábrelo, registra tus documentos y vuelve a revisar.";render();return;}
+  const ok=puntos().every(p=>Math.abs((RES[p[1]]||0)-p[2])<=p[3]);
+  if(ok)T.rev.ok=1;else T.rev.tries=(T.rev.tries||0)+1;
+  await guardar();keep(render);});
+ document.querySelectorAll("input[data-q]").forEach(r=>r.onchange=()=>{EV.ans[+r.dataset.q]=+r.value;});
+ const sd=document.querySelector("[data-send]");if(sd)sd.onclick=async()=>{
+  if(Object.keys(EV.ans).length<EV.qs.length){toast("Responde las 5 preguntas.");return;}
+  let ok=0;EV.qs.forEach((q,i)=>{if(q.o[EV.ans[i]].ok)ok++;});
+  EV.nota=ok;EV.fin=true;const est=D.estaciones[NE];est.intentos.push({v:EV.v,nota:ok,fecha:Date.now()});
+  if(ok>=CFG.notaMinima&&est.estado!=="aprobada")aprobar(D,NE,ok);
+  await guardar();keep(render);window.scrollTo(0,0);};
+ const rt=document.querySelector("[data-retry]");if(rt)rt.onclick=()=>{EV=null;render();window.scrollTo(0,0);};
+}
+function keep(fn){const y=window.scrollY;fn();window.scrollTo(0,y);}
+</script>
+</body>
+</html>

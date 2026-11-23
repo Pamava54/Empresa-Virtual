@@ -88,7 +88,8 @@ const Store={
   try{localStorage.setItem(this.key(n),JSON.stringify(limpio));}catch(e){}
  },
  async del(n){
-  if(this.mode==="firebase"){try{await this.ref(n).remove();}catch(e){this.fallo(e);}return;}
+  try{localStorage.removeItem("pv2_d_ev"+n);localStorage.removeItem("pamava_ev_sim_res_"+n);}catch(e){}
+  if(this.mode==="firebase"){try{await this.ref(n).remove();await this.db.ref("ev_sim/"+n).remove();}catch(e){this.fallo(e);}return;}
   try{localStorage.removeItem(this.key(n));}catch(e){}
  },
  async all(){
